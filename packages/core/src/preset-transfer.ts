@@ -614,14 +614,13 @@ export class PresetTransferService {
     };
     this.snapshot = snap;
     this.phase = "sending";
-    const totalMessages = 1 + PRESET_DATA_MESSAGE_COUNT;
     this.sendQueue = [
       buildPresetHeader(this.sysexId, snap),
       ...Array.from({ length: PRESET_DATA_MESSAGE_COUNT }, (_, i) =>
         buildPresetData(this.sysexId, i, snap.valuesByOffset)
       ),
     ];
-    this.emit(`Saving preset ${snap.number} (0/${totalMessages} sent)…`);
+    this.emit(`Saving preset ${snap.number} to device…`);
     this.ackTimeout = setTimeout(() => {
       if (this.phase === "sending" || this.phase === "awaiting_ack") {
         this.clearSendTimers();
@@ -632,16 +631,15 @@ export class PresetTransferService {
         );
       }
     }, PresetTransferService.SAVE_TOTAL_MS);
-    this.sendNextSaveMessage(totalMessages);
+    this.sendNextSaveMessage();
   }
 
   private onSavePaceAck(): void {
     if (this.paceTimeout) clearTimeout(this.paceTimeout);
     this.paceTimeout = null;
     this.awaitingPaceAck = false;
-    const totalMessages = 1 + PRESET_DATA_MESSAGE_COUNT;
     if (this.sendQueue.length > 0) {
-      this.sendNextSaveMessage(totalMessages);
+      this.sendNextSaveMessage();
       return;
     }
     this.finishSave();
@@ -658,7 +656,7 @@ export class PresetTransferService {
   }
 
   /** Send one SysEx message, then wait for notification 1 before the next (per manual). */
-  private sendNextSaveMessage(totalMessages: number): void {
+  private sendNextSaveMessage(): void {
     if (!this.sendOutput) {
       this.clearSendTimers();
       this.sendQueue = [];
@@ -671,20 +669,23 @@ export class PresetTransferService {
       this.emit("Waiting for final device confirmation…");
       return;
     }
-    const sent = totalMessages - this.sendQueue.length;
     const msg = this.sendQueue.shift()!;
     this.sendOutput(msg);
     this.awaitingPaceAck = true;
     this.phase = "sending";
+    const slot = this.snapshot?.number ?? "?";
+    const remaining = this.sendQueue.length;
     this.emit(
-      `Saving preset ${this.snapshot?.number ?? "?"} (${sent + 1}/${totalMessages} sent, waiting for ack)…`
+      remaining > 0
+        ? `Saving preset ${slot} to device…`
+        : `Saving preset ${slot} to device (finishing)…`
     );
     if (this.paceTimeout) clearTimeout(this.paceTimeout);
     this.paceTimeout = setTimeout(() => {
       if (!this.awaitingPaceAck || this.phase !== "sending") return;
       this.awaitingPaceAck = false;
       if (this.sendQueue.length > 0) {
-        this.sendNextSaveMessage(totalMessages);
+        this.sendNextSaveMessage();
       } else {
         this.finishSave();
       }
