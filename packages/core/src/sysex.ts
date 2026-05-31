@@ -1,5 +1,6 @@
 import {
   MODEL_ID,
+  MSG_EDITOR_MODE,
   MSG_PARAMETER_DATA,
   MSG_REQUEST_PARAMETER,
   TC_HELICON_MANUFACTURER,
@@ -35,10 +36,16 @@ export function unpack28(
   msb: number,
   lsb: number
 ): number {
+  // VoiceLive Touch / Axoloti negative shortcut
   if (msb3 === 31 && msb2 === 127 && msb === 127) {
     return lsb - 128;
   }
-  return msb3 * 2097152 + msb2 * 16384 + msb * 128 + lsb;
+  let raw = ((msb3 & 0x7f) << 21) | ((msb2 & 0x7f) << 14) | ((msb & 0x7f) << 7) | (lsb & 0x7f);
+  // 28-bit two's complement
+  if (raw & 0x8000000) {
+    raw -= 0x10000000;
+  }
+  return raw;
 }
 
 /** Unpack two 7-bit bytes into a signed 14-bit value. */
@@ -88,34 +95,93 @@ export function buildRequestParameter(
   ]);
 }
 
+/** Build Editor Mode (0x53) — mode 1 enables parameter echo over SysEx. */
+export function buildEditorMode(sysexId: number, mode: number): Uint8Array {
+  return new Uint8Array([...buildHeader(sysexId, MSG_EDITOR_MODE), mode, 0xf7]);
+}
+
+/** Reassemble SysEx fragments from Web MIDI (multi-packet messages). */
+export function createSysexAssembler(
+  onMessage: (message: Uint8Array) => void
+): (data: Uint8Array) => void {
+  let buffer: number[] = [];
+
+  return (data: Uint8Array) => {
+    for (let i = 0; i < data.length; i++) {
+      const byte = data[i];
+      if (byte === 0xf0) {
+        buffer = [0xf0];
+        continue;
+      }
+      if (buffer.length === 0) continue;
+      buffer.push(byte);
+      if (byte === 0xf7) {
+        onMessage(new Uint8Array(buffer));
+        buffer = [];
+      }
+    }
+  };
+}
+
 export interface ParsedParameterResponse {
   paramId: number;
   value: number;
 }
 
+function isParameterDataMessageId(byte: number): boolean {
+  return byte === MSG_PARAMETER_DATA || byte === 34;
+}
+
+function isModelId(byte: number): boolean {
+  return byte === MODEL_ID || byte === 91;
+}
+
 /**
  * Parse an incoming SysEx message. Returns param/value if it is a Parameter Data
  * response for this device (TC-Helicon VoiceLive Touch).
+ * If expectedSysexId is undefined, any SysEx ID in the message is accepted.
  */
 export function parseParameterResponse(
   data: Uint8Array,
-  sysexId: number
+  expectedSysexId?: number
 ): ParsedParameterResponse | null {
-  if (data.length < 14) return null;
-  if (data[0] !== 0xf0 || data[data.length - 1] !== 0xf7) return null;
-  if (
-    data[1] !== TC_HELICON_MANUFACTURER[0] ||
-    data[2] !== TC_HELICON_MANUFACTURER[1] ||
-    data[3] !== TC_HELICON_MANUFACTURER[2]
-  ) {
-    return null;
-  }
-  if (data[4] !== sysexId || data[5] !== MODEL_ID) return null;
-  if (data[6] !== MSG_PARAMETER_DATA) return null;
+  let start = 0;
+  let end = data.length;
+  if (data[0] === 0xf0) start = 1;
+  if (data.length > 0 && data[data.length - 1] === 0xf7) end = data.length - 1;
 
-  const paramId = unpack14(data[7], data[8]);
-  const value = unpack28(data[9], data[10], data[11], data[12]);
-  return { paramId, value };
+  const body = data.subarray(start, end);
+  if (body.length < 11) return null;
+
+  for (let i = 0; i <= body.length - 11; i++) {
+    if (
+      body[i] !== TC_HELICON_MANUFACTURER[0] ||
+      body[i + 1] !== TC_HELICON_MANUFACTURER[1] ||
+      body[i + 2] !== TC_HELICON_MANUFACTURER[2]
+    ) {
+      continue;
+    }
+
+    const sysexIdByte = body[i + 3];
+    const modelId = body[i + 4];
+    const messageId = body[i + 5];
+
+    if (!isModelId(modelId) || !isParameterDataMessageId(messageId)) continue;
+    if (expectedSysexId !== undefined && sysexIdByte !== expectedSysexId) {
+      continue;
+    }
+
+    const paramId = unpack14(body[i + 6], body[i + 7]);
+    const value = unpack28(
+      body[i + 8],
+      body[i + 9],
+      body[i + 10],
+      body[i + 11]
+    );
+    return { paramId, value };
+  }
+
+  return null;
 }
 
 /** Format bytes as hex for debug display. */

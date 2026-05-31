@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  buildEditorMode,
   buildRequestParameter,
   buildSetParameter,
+  createSysexAssembler,
   formatSysex,
   harmVol,
   parseParameterResponse,
@@ -17,26 +19,50 @@ function sortOutputs(outputs: MIDIOutput[]): MIDIOutput[] {
   return [...hinted, ...rest];
 }
 
-function findMatchingInput(
+function normalizePortName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, "")
+    .replace(/midi|usb|output|input|out|in/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Prefer inputs paired with the selected output; fall back to device-related ports. */
+function getInputsForOutput(
   access: MIDIAccess,
   output: MIDIOutput
-): MIDIInput | null {
-  const outputId = output.id;
-  const byPair = [...access.inputs.values()].find(
-    (input) => input.id === outputId.replace("output", "input")
-  );
-  if (byPair) return byPair;
+): MIDIInput[] {
+  const inputs = [...access.inputs.values()];
+  if (inputs.length === 0) return [];
 
-  const baseName = output.name?.replace(/\s*output\s*/i, "").trim();
-  if (baseName) {
-    for (const input of access.inputs.values()) {
-      if (input.name?.toLowerCase().includes(baseName.toLowerCase())) {
-        return input;
-      }
-    }
+  const outputId = output.id;
+  const paired = inputs.find(
+    (input) => input.id === outputId.replace(/output/i, "input")
+  );
+  if (paired) return [paired];
+
+  const base = normalizePortName(output.name ?? "");
+  if (base) {
+    const byName = inputs.filter((input) => {
+      const inBase = normalizePortName(input.name ?? "");
+      return inBase === base || inBase.includes(base) || base.includes(inBase);
+    });
+    if (byName.length > 0) return byName;
   }
 
-  return access.inputs.values().next().value ?? null;
+  const hinted = inputs.filter((input) =>
+    PORT_HINTS.some((h) => input.name?.toLowerCase().includes(h))
+  );
+  if (hinted.length > 0) return hinted;
+
+  return inputs;
+}
+
+async function openMidiPort(port: MIDIPort): Promise<void> {
+  if (port.state === "closed" && typeof port.open === "function") {
+    await port.open();
+  }
 }
 
 export interface UseMidiState {
@@ -45,6 +71,7 @@ export interface UseMidiState {
   error: string | null;
   outputs: MIDIOutput[];
   selectedOutputId: string;
+  inputPortName: string | null;
   sysexId: number;
   harmVolValue: number;
   lastSent: string | null;
@@ -64,6 +91,7 @@ export function useMidi(): UseMidiState {
   const [error, setError] = useState<string | null>(null);
   const [outputs, setOutputs] = useState<MIDIOutput[]>([]);
   const [selectedOutputId, setSelectedOutputIdState] = useState("");
+  const [inputPortName, setInputPortName] = useState<string | null>(null);
   const [sysexId, setSysexIdState] = useState(0);
   const [harmVolValue, setHarmVolValueState] = useState(harmVol.centre);
   const [lastSent, setLastSent] = useState<string | null>(null);
@@ -72,12 +100,65 @@ export function useMidi(): UseMidiState {
 
   const accessRef = useRef<MIDIAccess | null>(null);
   const outputRef = useRef<MIDIOutput | null>(null);
-  const inputRef = useRef<MIDIInput | null>(null);
+  const inputsRef = useRef<MIDIInput[]>([]);
   const sysexIdRef = useRef(sysexId);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipSendRef = useRef(false);
+  const assemblerRef = useRef<((data: Uint8Array) => void) | null>(null);
 
   sysexIdRef.current = sysexId;
+
+  const applyParameterValue = useCallback((value: number, raw: Uint8Array) => {
+    if (!Number.isFinite(value)) return;
+    const clamped = Math.round(
+      Math.max(harmVol.min, Math.min(harmVol.max, value))
+    );
+    setLastReceived(formatSysex(raw));
+    // Block slider onChange from overwriting this value (synthetic events after setState)
+    skipSendRef.current = true;
+    setHarmVolValueState(clamped);
+    setStatusText(`Harm Vol: ${clamped} dB (from device)`);
+    window.setTimeout(() => {
+      skipSendRef.current = false;
+    }, 150);
+  }, []);
+
+  const processSysexMessage = useCallback(
+    (bytes: Uint8Array) => {
+      setLastReceived(formatSysex(bytes));
+      const parsed =
+        parseParameterResponse(bytes, sysexIdRef.current) ??
+        parseParameterResponse(bytes);
+      if (!parsed || parsed.paramId !== harmVol.id) {
+        setStatusText(
+          parsed
+            ? `Ignored param ${parsed.paramId} (expected ${harmVol.id})`
+            : "Received SysEx (not Harm Vol param data)"
+        );
+        return;
+      }
+      applyParameterValue(parsed.value, bytes);
+    },
+    [applyParameterValue]
+  );
+
+  useEffect(() => {
+    assemblerRef.current = createSysexAssembler(processSysexMessage);
+  }, [processSysexMessage]);
+
+  const handleMidiMessage = useCallback((event: MIDIMessageEvent) => {
+    const data = event.data;
+    if (!data || data.length === 0) return;
+    assemblerRef.current?.(new Uint8Array(data));
+  }, []);
+
+  const clearInputHandlers = useCallback(() => {
+    for (const input of inputsRef.current) {
+      input.onmidimessage = null;
+    }
+    inputsRef.current = [];
+    setInputPortName(null);
+  }, []);
 
   const sendSysex = useCallback((bytes: Uint8Array) => {
     const out = outputRef.current;
@@ -91,49 +172,56 @@ export function useMidi(): UseMidiState {
     setStatusText("Requested Harm Vol…");
   }, [sendSysex]);
 
-  const handleMidiMessage = useCallback((event: MIDIMessageEvent) => {
-    const data = event.data;
-    if (!data || data[0] !== 0xf0) return;
+  const attachInputs = useCallback(
+    async (access: MIDIAccess, output: MIDIOutput) => {
+      clearInputHandlers();
 
-    const bytes = new Uint8Array(data);
-    const parsed = parseParameterResponse(bytes, sysexIdRef.current);
-    if (!parsed || parsed.paramId !== harmVol.id) return;
+      const inputs = getInputsForOutput(access, output);
+      const opened: MIDIInput[] = [];
 
-    const clamped = Math.max(harmVol.min, Math.min(harmVol.max, parsed.value));
-    setLastReceived(formatSysex(bytes));
-    skipSendRef.current = true;
-    setHarmVolValueState(clamped);
-    setStatusText(`Harm Vol: ${clamped} dB`);
-    queueMicrotask(() => {
-      skipSendRef.current = false;
-    });
-  }, []);
-
-  const attachInput = useCallback(
-    (access: MIDIAccess, output: MIDIOutput) => {
-      if (inputRef.current) {
-        inputRef.current.onmidimessage = null;
+      for (const input of inputs) {
+        try {
+          await openMidiPort(input);
+          input.onmidimessage = handleMidiMessage;
+          opened.push(input);
+        } catch {
+          // Still attach handler — some platforms report open errors spuriously
+          input.onmidimessage = handleMidiMessage;
+          opened.push(input);
+        }
       }
-      const input = findMatchingInput(access, output);
-      inputRef.current = input;
-      if (input) {
-        input.onmidimessage = handleMidiMessage;
-      }
+
+      inputsRef.current = opened;
+      setInputPortName(
+        opened.map((i) => i.name || i.id).join(", ") || "No MIDI input"
+      );
     },
-    [handleMidiMessage]
+    [clearInputHandlers, handleMidiMessage]
   );
 
   const selectOutput = useCallback(
-    (access: MIDIAccess, outputId: string) => {
+    async (access: MIDIAccess, outputId: string) => {
       const output = access.outputs.get(outputId);
       if (!output) return;
+
+      try {
+        await openMidiPort(output);
+      } catch {
+        // continue if send still works
+      }
+
       outputRef.current = output;
       setSelectedOutputIdState(outputId);
-      attachInput(access, output);
-      setStatusText(`Connected: ${output.name ?? outputId}`);
+      await attachInputs(access, output);
+
+      sendSysex(buildEditorMode(sysexIdRef.current, 1));
       requestHarmVol();
+
+      setStatusText(
+        `Out: ${output.name ?? outputId} · In: ${inputsRef.current.map((i) => i.name).join(", ") || "?"}`
+      );
     },
-    [attachInput, requestHarmVol]
+    [attachInputs, requestHarmVol, sendSysex]
   );
 
   const connect = useCallback(async () => {
@@ -159,7 +247,7 @@ export function useMidi(): UseMidiState {
         ) ?? list[0];
 
       setConnected(true);
-      selectOutput(access, preferred.id);
+      await selectOutput(access, preferred.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setConnected(false);
@@ -171,9 +259,8 @@ export function useMidi(): UseMidiState {
 
   const disconnect = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (inputRef.current) inputRef.current.onmidimessage = null;
+    clearInputHandlers();
     outputRef.current = null;
-    inputRef.current = null;
     accessRef.current = null;
     setConnected(false);
     setOutputs([]);
@@ -181,13 +268,13 @@ export function useMidi(): UseMidiState {
     setStatusText("Disconnected");
     setLastSent(null);
     setLastReceived(null);
-  }, []);
+  }, [clearInputHandlers]);
 
   const setSelectedOutputId = useCallback(
     (id: string) => {
       const access = accessRef.current;
       if (!access || !id) return;
-      selectOutput(access, id);
+      void selectOutput(access, id);
     },
     [selectOutput]
   );
@@ -200,10 +287,16 @@ export function useMidi(): UseMidiState {
 
   const setHarmVolValue = useCallback(
     (value: number) => {
-      const clamped = Math.max(harmVol.min, Math.min(harmVol.max, Math.round(value)));
+      // Ignore synthetic onChange fired when we update value from incoming SysEx
+      if (skipSendRef.current) return;
+
+      const clamped = Math.max(
+        harmVol.min,
+        Math.min(harmVol.max, Math.round(value))
+      );
       setHarmVolValueState(clamped);
 
-      if (!connected || skipSendRef.current) return;
+      if (!connected) return;
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
@@ -217,9 +310,9 @@ export function useMidi(): UseMidiState {
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      if (inputRef.current) inputRef.current.onmidimessage = null;
+      clearInputHandlers();
     };
-  }, []);
+  }, [clearInputHandlers]);
 
   return {
     connected,
@@ -227,6 +320,7 @@ export function useMidi(): UseMidiState {
     error,
     outputs,
     selectedOutputId,
+    inputPortName,
     sysexId,
     harmVolValue,
     lastSent,

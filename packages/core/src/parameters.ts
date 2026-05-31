@@ -19,3 +19,4 @@ export const TC_HELICON_MANUFACTURER = [0x00, 0x01, 0x38] as const;
 export const MODEL_ID = 0x5b;
 export const MSG_PARAMETER_DATA = 0x22;
 export const MSG_REQUEST_PARAMETER = 0x47;
+export const MSG_EDITOR_MODE = 0x53;

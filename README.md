@@ -4,7 +4,15 @@ Standalone macOS editor for the TC-Helicon **Voice Live Touch**, using MIDI SysE
 
 ## Requirements
 
-- macOS with Node.js 20+
+- macOS with **Node.js 20+** and npm
+
+If `npm` is not found, install Node via Homebrew:
+
+```bash
+brew install node
+```
+
+Ensure `/opt/homebrew/bin` is on your PATH (Apple Silicon). Then open a **new terminal** tab.
 - Voice Live Touch connected via USB
 - MIDI enabled on the device
 - SysEx ID on the unit matching the app (default **0**, set under device MIDI/setup → `Utility SysEx_ID`)
@@ -39,7 +47,7 @@ examples/          Reference Axoloti / Max editors
 
 - **No outputs listed** — Check USB cable, power, and that the device exposes a MIDI port to macOS (Audio MIDI Setup).
 - **Slider moves but device unchanged** — Verify **SysEx ID** matches the value in the device menu (0–127). Wrong ID is ignored by the unit.
-- **No readback on connect** — Ensure you selected the correct output; the app pairs with a matching input when possible. Try **Refresh** after changing a control on the hardware.
+- **No readback on connect** — The app opens MIDI **input** ports explicitly (required for Web MIDI receive). Check the “MIDI input (listening)” line matches your device. Try **Refresh**. Enable **Editor Mode** is sent automatically on connect so the unit echoes parameter changes.
 - **SysEx permission** — The app requests `sysex: true` on Web MIDI; use the system prompt when connecting.
 
 ## Protocol reference

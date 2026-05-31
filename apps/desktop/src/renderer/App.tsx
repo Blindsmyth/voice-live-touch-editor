@@ -45,6 +45,15 @@ export function App() {
             </select>
           </div>
 
+          {midi.inputPortName && (
+            <div className="field">
+              <label>MIDI input (listening)</label>
+              <p className="subtitle" style={{ margin: 0 }}>
+                {midi.inputPortName}
+              </p>
+            </div>
+          )}
+
           <div className="field">
             <label htmlFor="sysex-id">SysEx ID (device MIDI menu)</label>
             <input
@@ -66,8 +75,9 @@ export function App() {
               type="range"
               min={harmVol.min}
               max={harmVol.max}
+              step={1}
               value={midi.harmVolValue}
-              onChange={(e) => midi.setHarmVolValue(Number(e.target.value))}
+              onInput={(e) => midi.setHarmVolValue(Number(e.currentTarget.value))}
             />
             <p className="subtitle" style={{ marginTop: "0.35rem", marginBottom: 0 }}>
               Range {harmVol.min} … {harmVol.max} dB (centre {harmVol.centre})
