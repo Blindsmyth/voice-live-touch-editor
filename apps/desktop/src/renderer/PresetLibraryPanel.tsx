@@ -9,8 +9,7 @@ export interface PresetLibraryPanelProps {
   bulkActive: boolean;
   selectedWorkspaceSlot: number | null;
   onSelectSlot: (slot: number) => void;
-  onLoadAllNames: () => void;
-  onLoadAllFull: () => void;
+  onLoadAll: () => void;
   onCancelBulk: () => void;
   onBackupWorkspace: () => void;
   onExportSelected: () => void;
@@ -30,8 +29,7 @@ export function PresetLibraryPanel({
   bulkActive,
   selectedWorkspaceSlot,
   onSelectSlot,
-  onLoadAllNames,
-  onLoadAllFull,
+  onLoadAll,
   onCancelBulk,
   onBackupWorkspace,
   onExportSelected,
@@ -53,22 +51,17 @@ export function PresetLibraryPanel({
       <p className="subtitle">Workspace, snapshots & bulk device sync</p>
 
       <h3>Device sync</h3>
+      <p className="subtitle small-hint">
+        Start here: load the full preset bank from the device, then edit in the
+        workspace.
+      </p>
       <div className="library-actions">
         <button
           type="button"
-          className="secondary"
           disabled={!connected || bulkActive}
-          onClick={onLoadAllNames}
+          onClick={onLoadAll}
         >
-          Load all names
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          disabled={!connected || bulkActive}
-          onClick={onLoadAllFull}
-        >
-          Load all (full)
+          Load all from device
         </button>
         <button
           type="button"
@@ -171,7 +164,7 @@ export function PresetLibraryPanel({
       <h3>Workspace ({workspace.length})</h3>
       {workspace.length === 0 ? (
         <p className="vlt-empty small">
-          Use Load all names on the device to fill the slot list and workspace.
+          Use Load all from device to sync presets 1–275, then edit.
         </p>
       ) : (
         <ul className="workspace-list">

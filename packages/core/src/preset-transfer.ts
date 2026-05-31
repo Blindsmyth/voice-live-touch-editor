@@ -531,9 +531,7 @@ export class PresetTransferService {
       this.emit(
         mode === "send-all"
           ? "Send all complete."
-          : mode === "load-full"
-            ? "Load all complete."
-            : "Load all names complete."
+          : "Load all complete — workspace ready to edit."
       );
       return;
     }

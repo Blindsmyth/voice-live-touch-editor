@@ -274,6 +274,12 @@
   color: #9898a8;
 }
 
+.library-panel .small-hint {
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem;
+  color: #9898a8;
+}
+
 .workspace-list,
 .backup-list {
   list-style: none;

@@ -21,8 +21,7 @@ export function EditorShell() {
     presetName,
     setPresetName,
     loadPresetFromDevice,
-    loadAllNamesFromDevice,
-    loadAllFullFromDevice,
+    loadAllFromDevice,
     cancelBulkTransfer,
     bulkActive,
     slotOptions,
@@ -154,7 +153,7 @@ export function EditorShell() {
           presetName={presetName}
           onPresetNameChange={setPresetName}
           onLoad={loadPresetFromDevice}
-          onLoadAllNames={loadAllNamesFromDevice}
+          onLoadAll={loadAllFromDevice}
           onCancelBulk={cancelBulkTransfer}
           onSave={savePresetToDevice}
           transferStatus={presetStatus}
@@ -235,8 +234,7 @@ export function EditorShell() {
                 setPresetName(entry.name);
               }
             }}
-            onLoadAllNames={loadAllNamesFromDevice}
-            onLoadAllFull={loadAllFullFromDevice}
+            onLoadAll={loadAllFromDevice}
             onCancelBulk={cancelBulkTransfer}
             onBackupWorkspace={() => void saveSnapshotBackup()}
             onExportSelected={() => void exportSelectedPreset()}

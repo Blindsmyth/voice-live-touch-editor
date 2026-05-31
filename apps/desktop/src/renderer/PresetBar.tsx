@@ -7,7 +7,7 @@ export interface PresetBarProps {
   presetName: string;
   onPresetNameChange: (name: string) => void;
   onLoad: () => void;
-  onLoadAllNames: () => void;
+  onLoadAll: () => void;
   onCancelBulk: () => void;
   onSave: () => void;
   transferStatus: string;
@@ -23,7 +23,7 @@ export function PresetBar({
   presetName,
   onPresetNameChange,
   onLoad,
-  onLoadAllNames,
+  onLoadAll,
   onCancelBulk,
   onSave,
   transferStatus,
@@ -70,10 +70,10 @@ export function PresetBar({
         type="button"
         className="secondary"
         disabled={!connected || bulkActive}
-        title="Fetch names for presets 1–275 (fast)"
-        onClick={onLoadAllNames}
+        title="Load all 275 user presets (full data) — do this first"
+        onClick={onLoadAll}
       >
-        Load all names
+        Load all
       </button>
       {bulkActive && (
         <button type="button" className="secondary" onClick={onCancelBulk}>

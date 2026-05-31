@@ -53,8 +53,7 @@ interface MidiContextValue {
   presetName: string;
   setPresetName: (n: string) => void;
   loadPresetFromDevice: () => void;
-  loadAllNamesFromDevice: () => void;
-  loadAllFullFromDevice: () => void;
+  loadAllFromDevice: () => void;
   cancelBulkTransfer: () => void;
   bulkActive: boolean;
   savePresetToDevice: () => void;
@@ -173,6 +172,23 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       if (bulk && (status.includes("complete") || status.includes("cancelled"))) {
         setBulkActive(false);
         setLibraryStatus(status);
+        if (
+          status.includes("Load all complete") &&
+          workspaceStore.list().length > 0
+        ) {
+          const first =
+            workspaceStore.get(1) ?? workspaceStore.list()[0];
+          if (first) {
+            loadedSnapshotRef.current = cloneSnapshot(first.snapshot);
+            setHasLoadedSnapshot(true);
+            setPresetSlot(first.slot);
+            setPresetName(first.name);
+            midiParameterService.applySnapshotValues(
+              snapshotToLiveValues(first.snapshot)
+            );
+            setTick((t) => t + 1);
+          }
+        }
       }
     });
   }, [presetSlot]);
@@ -261,30 +277,23 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     presetTransferService.requestPreset(loadSlot);
   }, [conn.connected, presetSlot]);
 
-  const loadAllNamesFromDevice = useCallback(() => {
+  const loadAllFromDevice = useCallback(() => {
     if (!conn.connected) return;
+    const ok = window.confirm(
+      "Load all 275 user presets from the device (full data)? This takes several minutes and is the recommended first step before editing."
+    );
+    if (!ok) return;
     if (presetTransferService.getBulkProgress().active) {
       presetTransferService.cancelBulk();
     }
     if (presetTransferService.getPhase() === "receiving") {
       presetTransferService.cancelReceive();
     }
+    setHasLoadedSnapshot(false);
+    loadedSnapshotRef.current = null;
     midiParameterService.enableEditorMode();
-    setLibraryStatus("Loading all preset names from device…");
-    presetTransferService.startBulkLoadHeaders(allUserPresetSlots());
-  }, [conn.connected]);
-
-  const loadAllFullFromDevice = useCallback(() => {
-    if (!conn.connected) return;
-    const ok = window.confirm(
-      "Load all 275 user presets from the device? This takes several minutes."
-    );
-    if (!ok) return;
-    if (presetTransferService.getBulkProgress().active) {
-      presetTransferService.cancelBulk();
-    }
-    midiParameterService.enableEditorMode();
-    setLibraryStatus("Loading all presets (full dump)…");
+    setPresetStatus("Loading all presets from device…");
+    setLibraryStatus("Loading all presets from device…");
     presetTransferService.startBulkLoadFull(allUserPresetSlots());
   }, [conn.connected]);
 
@@ -594,8 +603,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       presetName,
       setPresetName,
       loadPresetFromDevice,
-      loadAllNamesFromDevice,
-      loadAllFullFromDevice,
+      loadAllFromDevice,
       cancelBulkTransfer,
       bulkActive,
       savePresetToDevice,
@@ -637,8 +645,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       presetSlot,
       presetName,
       loadPresetFromDevice,
-      loadAllNamesFromDevice,
-      loadAllFullFromDevice,
+      loadAllFromDevice,
       cancelBulkTransfer,
       bulkActive,
       savePresetToDevice,
