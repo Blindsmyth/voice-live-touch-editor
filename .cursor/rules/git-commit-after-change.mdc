@@ -1,0 +1,22 @@
+---
+description: Commit git changes after each completed task or code change
+alwaysApply: true
+---
+
+# Git commit after changes
+
+When you finish a coherent unit of work (feature, bug fix, or refactor) in this repo:
+
+1. **Do not** commit secrets (`.env`, credentials) or build artifacts (`node_modules/`, `out/`, `dist/`, `release/`).
+2. Run `git status` and `git diff` to verify what will be committed.
+3. Stage only files that belong to the change; do not add accidental zero-byte files like `npm` or `electron-vite` at repo root.
+4. Create a commit with a concise message (1–2 sentences, focus on *why*). Use a HEREDOC for the message.
+5. Run `git status` after commit to confirm success.
+
+**Do not** push unless the user explicitly asks.
+
+**Do not** amend unless the user asked or a hook auto-modified files on a commit you just made.
+
+If the user only asked a question with no code changes, skip committing.
+
+If a change was reverted or aborted with nothing left to commit, skip committing.

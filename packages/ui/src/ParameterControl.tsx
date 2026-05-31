@@ -1,4 +1,4 @@
-import { enumLabel, type ParameterDef } from "@vlt/core";
+import { parameterValueLabel, type ParameterDef } from "@vlt/core";
 
 export interface ParameterControlProps {
   param: ParameterDef;
@@ -32,25 +32,27 @@ export function ParameterControl({
     );
   }
 
-  const options = param.options;
-  if (options?.length) {
+  if (param.control === "select" && param.options?.length) {
+    const clamped = Math.max(param.min, Math.min(param.max, value));
     return (
       <div className="vlt-param-control vlt-param-select">
         <select
-          value={value}
+          value={clamped}
           disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
         >
-          {options.map((o) => (
+          {param.options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
         </select>
-        <span className="vlt-param-value vlt-enum-hint">{value}</span>
+        <span className="vlt-param-value vlt-enum-hint">{clamped}</span>
       </div>
     );
   }
+
+  const clamped = Math.max(param.min, Math.min(param.max, value));
 
   return (
     <div className="vlt-param-control">
@@ -59,12 +61,14 @@ export function ParameterControl({
         min={param.min}
         max={param.max}
         step={1}
-        value={value}
+        value={clamped}
         disabled={disabled}
         onInput={(e) => onChange(Number(e.currentTarget.value))}
       />
       <span className="vlt-param-value">
-        {param.options ? enumLabel(param.id, value) : `${value}${unit}`}
+        {param.options?.length || /Int_(shift|scale)/.test(param.name)
+          ? parameterValueLabel(param, clamped)
+          : `${clamped}${unit}`}
       </span>
     </div>
   );

@@ -9,10 +9,22 @@ export interface ParameterGroupInfo {
 
 export const parameterGroups: ParameterGroupInfo[] = [
   {
-    "id": "EQ",
-    "label": "EQ",
+    "id": "EQ Voice",
+    "label": "EQ Voice",
+    "presetCount": 0,
+    "systemCount": 7
+  },
+  {
+    "id": "EQ Guitar",
+    "label": "EQ Guitar",
+    "presetCount": 0,
+    "systemCount": 7
+  },
+  {
+    "id": "EQ Harmony",
+    "label": "EQ Harmony",
     "presetCount": 7,
-    "systemCount": 14
+    "systemCount": 0
   },
   {
     "id": "Gate",

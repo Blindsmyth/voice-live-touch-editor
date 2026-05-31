@@ -29,10 +29,14 @@ const LABEL_ALIASES = {
   136: "Harmony Release",
   139: "Harmony Hold Release",
   142: "Harmony Notes Ext",
+  943: "V12 Perfect 5th",
+  955: "V34 Perfect 5th",
 };
 
 const GROUP_ORDER = [
-  "EQ",
+  "EQ Voice",
+  "EQ Guitar",
+  "EQ Harmony",
   "Gate",
   "Harmony",
   "Doubling",
@@ -49,6 +53,9 @@ const GROUP_ORDER = [
 ];
 
 function deriveGroup(name) {
+  if (/^ParEq .* Voice/.test(name)) return "EQ Voice";
+  if (/^ParEq .* Guitar/.test(name)) return "EQ Guitar";
+  if (/^ParEq .* Harm/.test(name)) return "EQ Harmony";
   if (/^HarmonyMapCus|^Harmony |^Choir /.test(name)) return "Harmony";
   if (/^Doubling /.test(name)) return "Doubling";
   if (/^Mixer_/.test(name)) return "Mixer";
@@ -58,15 +65,67 @@ function deriveGroup(name) {
   if (/^Transducer /.test(name)) return "Transducer";
   if (/^Correct |^Hardtune |^CorrectionMapCus/.test(name)) return "Pitch";
   if (/^Ducking /.test(name)) return "Ducking";
-  if (/^ParEq /.test(name)) return "EQ";
+  if (/^ParEq /.test(name)) return "EQ Harmony";
   if (/^AutoGate/.test(name)) return "Gate";
   if (/^Utility |^Preset |^Block /.test(name)) return "Setup";
   return "Other";
 }
 
+/** Device-oriented section order (VoiceLive 2 / Touch SysEx table + edit menus). */
+function deriveSection(name, group, offset, id) {
+  if (group === "Harmony") {
+    if (/HarmonyMapCus/.test(name)) return { section: "Custom scale map", sectionOrder: 90 };
+    if (/^Harmony Notes/.test(name)) return { section: "Notes mode", sectionOrder: 70 };
+    if ([106, 107, 108, 111].includes(id) || (offset >= 19 && offset <= 22))
+      return { section: "Key & scale", sectionOrder: 20 };
+    const voice = name.match(/\bV([1-4])\b/);
+    if (voice && /Int_|Gender|Portamento|Smoothing/.test(name))
+      return { section: `Voice ${voice[1]}`, sectionOrder: 30 + Number(voice[1]) };
+    if (
+      /GroupStyle|Human|Vibrato|Choir|NaturalPlay|Tuning/.test(name) ||
+      (offset >= 9 && offset <= 18)
+    )
+      return { section: "Styles & choir", sectionOrder: 10 };
+    if (/Attack|Release|Hold|Latch|Chord|Doubling|NotesExt|Notes_/.test(name))
+      return { section: "Envelope & routing", sectionOrder: 60 };
+    return { section: "Harmony (other)", sectionOrder: 80 };
+  }
+  if (group === "Doubling") {
+    const voice = name.match(/\bV([1-4])\b/);
+    if (voice && /Smoothing|Portamento|Gender/.test(name))
+      return { section: `Voice ${voice[1]}`, sectionOrder: 20 + Number(voice[1]) };
+    if (/GroupStyle|Human|Harmony Doubling/.test(name) || offset >= 57 && offset <= 59)
+      return { section: "Doubling style", sectionOrder: 10 };
+    return { section: "Doubling (other)", sectionOrder: 50 };
+  }
+  if (group === "Pitch") {
+    if (/Hardtune|Correct (Key|Scale|Amount|Window|Rate|Shift|Lead)/.test(name))
+      return { section: "HardTune / Correct", sectionOrder: 10 };
+    if (/CorrectionMapCus/.test(name)) return { section: "Custom correct map", sectionOrder: 20 };
+    return { section: "Pitch (other)", sectionOrder: 30 };
+  }
+  if (group === "Mixer") {
+    if (name.includes("Mixer_LP")) return { section: "Per-voice sends", sectionOrder: 20 };
+    if (name.includes("Mixer_LW")) return { section: "Stereo width", sectionOrder: 30 };
+    if (name.includes("Mixer_L_6dB")) return { section: "6 dB boost", sectionOrder: 40 };
+    return { section: "Mix levels", sectionOrder: 10 };
+  }
+  if (group === "EQ") return { section: "Parametric EQ", sectionOrder: 10 };
+  if (group === "Gate") return { section: "Auto gate", sectionOrder: 10 };
+  if (group === "Setup") {
+    if (/^Block /.test(name)) return { section: "Effect blocks", sectionOrder: 10 };
+    if (/^Utility /.test(name)) return { section: "Utility", sectionOrder: 20 };
+    if (/^Preset /.test(name)) return { section: "Preset meta", sectionOrder: 30 };
+    return { section: "Setup", sectionOrder: 40 };
+  }
+  return { section: group, sectionOrder: 10 };
+}
+
 function deriveSubgroup(name, group) {
   const parts = name.split(" ");
   if (group === "Harmony" && /V[1-4]$/.test(name)) return parts.slice(-2).join(" ");
+  if (group === "Harmony" && /^(Harmony Key|Harmony Scale|Harmony Tuning|Harmony NaturalPlay)$/.test(name))
+    return "Key & scale";
   if (group === "Mixer") {
     if (name.includes("Mixer_LP")) return "Per-voice";
     if (name.includes("Mixer_LW")) return "Width";
@@ -122,6 +181,9 @@ function parseTable(sectionTitle) {
     });
   }
   for (const r of rows) {
+    const { section, sectionOrder } = deriveSection(r.name, r.group, r.offset, r.id);
+    r.section = section;
+    r.sectionOrder = sectionOrder;
     r.subgroup = deriveSubgroup(r.name, r.group) || undefined;
   }
   return rows;
@@ -129,6 +191,14 @@ function parseTable(sectionTitle) {
 
 function optionsFor(p) {
   if (PARAMETER_ENUMS[String(p.id)]) return PARAMETER_ENUMS[String(p.id)];
+  if (p.control === "toggle") {
+    return [
+      { value: 0, label: "Off" },
+      { value: 1, label: "On" },
+    ];
+  }
+  // Int_shift / Int_scale: slider + runtime semitone labels (see parameter-enums.ts)
+  if (/Int_(shift|scale)/.test(p.name)) return undefined;
   if (p.control === "select" && p.min >= 0 && p.max - p.min <= 30) {
     return Array.from({ length: p.max - p.min + 1 }, (_, i) => ({
       value: p.min + i,
@@ -140,9 +210,12 @@ function optionsFor(p) {
 
 function emitParam(p) {
   const sub = p.subgroup ? `, subgroup: ${JSON.stringify(p.subgroup)}` : "";
+  const sec = p.section
+    ? `, section: ${JSON.stringify(p.section)}, sectionOrder: ${p.sectionOrder}`
+    : "";
   const opts = optionsFor(p);
   const options = opts ? `, options: ${JSON.stringify(opts)}` : "";
-  return `  { id: ${p.id}, offset: ${p.offset}, name: ${JSON.stringify(p.name)}, label: ${JSON.stringify(p.label)}, scope: "${p.scope}", group: ${JSON.stringify(p.group)}, min: ${p.min}, max: ${p.max}, centre: ${p.centre}, control: "${p.control}"${sub}${options} }`;
+  return `  { id: ${p.id}, offset: ${p.offset}, name: ${JSON.stringify(p.name)}, label: ${JSON.stringify(p.label)}, scope: "${p.scope}", group: ${JSON.stringify(p.group)}, min: ${p.min}, max: ${p.max}, centre: ${p.centre}, control: "${p.control}"${sec}${sub}${options} }`;
 }
 
 const preset = parseTable("## Preset package parameter table");

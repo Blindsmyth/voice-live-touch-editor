@@ -1,4 +1,15 @@
 {
+  "0": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "Normal" },
+    { "value": 2, "label": "Less Bright" },
+    { "value": 3, "label": "Norm + Warmth" },
+    { "value": 4, "label": "More Comp" },
+    { "value": 5, "label": "Normal (no gate)" },
+    { "value": 6, "label": "Less Bright (no gate)" },
+    { "value": 7, "label": "Warmth (no gate)" },
+    { "value": 8, "label": "More Comp (no gate)" }
+  ],
   "107": [
     { "value": 0, "label": "C" },
     { "value": 1, "label": "C#" },
@@ -36,9 +47,133 @@
     { "value": 10, "label": "Bb" },
     { "value": 11, "label": "B" }
   ],
+  "837": [
+    { "value": 0, "label": "Major" },
+    { "value": 1, "label": "Minor (harmonic)" },
+    { "value": 2, "label": "Minor (natural)" },
+    { "value": 3, "label": "Minor (ascending)" },
+    { "value": 4, "label": "Chromatic" },
+    { "value": 5, "label": "Custom" }
+  ],
+  "106": [
+    { "value": 0, "label": "Guitar" },
+    { "value": 1, "label": "MIDI" },
+    { "value": 2, "label": "Aux input" },
+    { "value": 3, "label": "Auto input sense" },
+    { "value": 4, "label": "Scale (fixed key)" },
+    { "value": 5, "label": "Shift" },
+    { "value": 6, "label": "MIDI notes" },
+    { "value": 7, "label": "MIDI notes 4 ch" }
+  ],
+  "82": [
+    { "value": 0, "label": "Scoop down" },
+    { "value": 1, "label": "Scoop up" },
+    { "value": 2, "label": "Scoop + time" },
+    { "value": 3, "label": "Loose" },
+    { "value": 4, "label": "Timing" },
+    { "value": 5, "label": "Time + pitch" },
+    { "value": 6, "label": "Pitch" }
+  ],
+  "162": [
+    { "value": 0, "label": "Scoop down" },
+    { "value": 1, "label": "Scoop up" },
+    { "value": 2, "label": "Scoop + time" },
+    { "value": 3, "label": "Loose" },
+    { "value": 4, "label": "Timing" },
+    { "value": 5, "label": "Time + pitch" },
+    { "value": 6, "label": "Pitch" }
+  ],
+  "83": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "Style 1" },
+    { "value": 2, "label": "Style 2" },
+    { "value": 3, "label": "Style 3" },
+    { "value": 4, "label": "Style 4" },
+    { "value": 5, "label": "Style 5" },
+    { "value": 6, "label": "Style 6" },
+    { "value": 7, "label": "Style 7" }
+  ],
+  "829": [
+    { "value": 0, "label": "Follow harmony" },
+    { "value": 1, "label": "Fixed key" }
+  ],
+  "111": [
+    { "value": 0, "label": "A = 440 Hz" },
+    { "value": 1, "label": "A = 432 Hz" },
+    { "value": 2, "label": "Custom" }
+  ],
   "61": [
     { "value": 0, "label": "Off" },
     { "value": 1, "label": "Soft" },
     { "value": 2, "label": "Hard" }
+  ],
+  "132": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "On" }
+  ],
+  "133": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "On" }
+  ],
+  "172": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "On" }
+  ],
+  "157": [
+    { "value": 0, "label": "Left" },
+    { "value": 1, "label": "Center" },
+    { "value": 2, "label": "Right" }
+  ],
+  "65": [
+    { "value": 0, "label": "Adaptive" },
+    { "value": 1, "label": "Manual" }
+  ],
+  "112": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "2nd below" },
+    { "value": 2, "label": "Unison" },
+    { "value": 3, "label": "2nd above" },
+    { "value": 4, "label": "3rd above" },
+    { "value": 5, "label": "4th above" },
+    { "value": 6, "label": "5th above" }
+  ],
+  "113": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "2nd below" },
+    { "value": 2, "label": "Unison" },
+    { "value": 3, "label": "2nd above" },
+    { "value": 4, "label": "3rd above" },
+    { "value": 5, "label": "4th above" },
+    { "value": 6, "label": "5th above" }
+  ],
+  "114": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "2nd below" },
+    { "value": 2, "label": "Unison" },
+    { "value": 3, "label": "2nd above" },
+    { "value": 4, "label": "3rd above" },
+    { "value": 5, "label": "4th above" },
+    { "value": 6, "label": "5th above" }
+  ],
+  "115": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "2nd below" },
+    { "value": 2, "label": "Unison" },
+    { "value": 3, "label": "2nd above" },
+    { "value": 4, "label": "3rd above" },
+    { "value": 5, "label": "4th above" },
+    { "value": 6, "label": "5th above" }
+  ],
+  "79": [
+    { "value": 0, "label": "Humanized" },
+    { "value": 1, "label": "Tight" },
+    { "value": 2, "label": "Male" },
+    { "value": 3, "label": "Female" }
+  ],
+  "80": [
+    { "value": 0, "label": "Humanized" },
+    { "value": 1, "label": "Tight" },
+    { "value": 2, "label": "Male" },
+    { "value": 3, "label": "Female" }
   ]
 }

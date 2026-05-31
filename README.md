@@ -33,6 +33,7 @@ Connect MIDI → choose **Preset** or **System** scope → pick a group in the s
 | Command | Description |
 |---------|-------------|
 | `npm run generate` | Regenerate parameter tables from [docs/VoiceLive-Touch-Sysex-Manual.md](docs/VoiceLive-Touch-Sysex-Manual.md) |
+| `npm run extract-manual` | Re-extract [docs/VoiceLive-2-Manual-v1-5.md](docs/VoiceLive-2-Manual-v1-5.md) from the VoiceLive 2 PDF (requires `.venv-pdf`) |
 | `npm run dev` | Electron dev with HMR |
 | `npm run build` | Production build |
 | `npm run dist` | macOS `.dmg` / `.zip` |
@@ -53,6 +54,7 @@ examples/            Reference Axoloti / Max editors
 - [VoiceLive-Touch-Sysex-Manual.md](docs/VoiceLive-Touch-Sysex-Manual.md) — protocol and parameter IDs
 - [VoiceLive-Touch-User-Manual.md](docs/VoiceLive-Touch-User-Manual.md) — device UI context (German source PDF)
 - [VoiceSupport-Reference-Manual.md](docs/VoiceSupport-Reference-Manual.md) — local library / backup UX (VoiceSupport-inspired)
+- [VoiceLive-2-Manual-v1-5.md](docs/VoiceLive-2-Manual-v1-5.md) — VoiceLive 2 user manual (v1.5 PDF extract; MIDI CC labels, harmony UI)
 
 ## MIDI troubleshooting
 

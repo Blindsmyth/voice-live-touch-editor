@@ -287,6 +287,156 @@
   padding: 0;
 }
 
+.backup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #3a3a4a;
+}
+
+.backup-id {
+  font-size: 0.75rem;
+  color: #b0b0bc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.vlt-section-help {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #9898a8;
+}
+
+.custom-scale-map {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.custom-scale-map-warn {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  background: #3d3520;
+  border-radius: 6px;
+  color: #ffb347;
+  font-size: 0.8rem;
+}
+
+.custom-scale-map-intro,
+.custom-scale-map-degree-name {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #b0b0bc;
+  line-height: 1.45;
+}
+
+.custom-scale-map-step-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a8a8b8;
+  margin-bottom: 0.35rem;
+}
+
+.custom-scale-map-degrees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.degree-btn {
+  min-width: 2.6rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.68rem;
+  border: 1px solid #3a3a4a;
+  border-radius: 4px;
+  background: #1e1e28;
+  color: #e8e8ec;
+  cursor: pointer;
+}
+
+.degree-btn.active {
+  background: #4a5a9a;
+  border-color: #6a7aba;
+}
+
+.custom-scale-map-packed {
+  margin-left: 0.5rem;
+  opacity: 0.7;
+  font-size: 0.7rem;
+}
+
+.custom-scale-map-voice-row {
+  margin-bottom: 0.65rem;
+}
+
+.custom-scale-map-voice-label {
+  display: inline-block;
+  min-width: 4.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.custom-scale-map-voice-value {
+  font-size: 0.75rem;
+  color: #9898a8;
+  margin-left: 0.35rem;
+}
+
+.custom-scale-map-piano {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1px;
+  overflow-x: auto;
+  margin-top: 0.35rem;
+  padding-bottom: 0.25rem;
+}
+
+.piano-key {
+  flex: 0 0 1.1rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid #3a3a4a;
+  border-radius: 2px;
+  background: #2a2a36;
+  color: #888;
+  font-size: 0.55rem;
+  cursor: pointer;
+}
+
+.piano-key-uni {
+  background: #3a3a50;
+  color: #e8e8ec;
+  flex-basis: 1.6rem;
+}
+
+.piano-key-nc {
+  flex-basis: 1.6rem;
+  background: #2e2e38;
+}
+
+.piano-key-active {
+  background: #5a7ad4;
+  border-color: #8aa8ff;
+  color: #fff;
+}
+
+.custom-scale-map-raw {
+  font-size: 0.75rem;
+  color: #9898a8;
+}
+
+.custom-scale-map-raw ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.2rem;
+}
+
 .workspace-item {
   display: flex;
   gap: 0.5rem;

@@ -13,12 +13,25 @@ export interface ParameterDef {
   label: string;
   scope: ParameterScope;
   group: string;
+  /** Logical UI section within the group (device edit order). */
+  section?: string;
+  /** Sort key for sections; lower appears first. */
+  sectionOrder?: number;
+  /** Sort within a section; lower appears first. */
+  displayOrder?: number;
   subgroup?: string;
   min: number;
   max: number;
   centre: number;
   control: ParameterControl;
   options?: EnumOption[];
+}
+
+/** Parameter row in the UI (native or mirrored from another sidebar group). */
+export interface DisplayedParameter extends ParameterDef {
+  uiKey: string;
+  /** Sidebar group where the canonical control also lives. */
+  mirroredFrom?: string;
 }
 
 /** @deprecated use presetParameters — Harm Vol (Mixer_L Level Harmony) */

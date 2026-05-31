@@ -6,3 +6,8 @@ release/
 *.log
 .env
 .env.*
+.venv-pdf/
+
+# Accidental empty files from mistyped shell commands
+/npm
+/electron-vite

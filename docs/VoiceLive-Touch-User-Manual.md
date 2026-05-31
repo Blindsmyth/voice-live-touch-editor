@@ -165,7 +165,7 @@
 
 ### MIDI enum appendix (editor)
 
-Discrete parameters use labels from the VoiceLive Touch Complete Manual (ENG) MIDI table. Maintained in `packages/core/src/parameter-enums.json`.
+Discrete parameters use labels from the VoiceLive Touch Complete Manual (ENG) MIDI table and [VoiceLive-2-Manual-v1-5.md](./VoiceLive-2-Manual-v1-5.md) (MIDI implementation, pp. 98–100). Maintained in `packages/core/src/parameter-enums.json`.
 
 | SysEx ID | Name | Values |
 |----------|------|--------|
