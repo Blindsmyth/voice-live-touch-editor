@@ -65,6 +65,7 @@ export function useMidiConnection() {
 
   const accessRef = useRef<MIDIAccess | null>(null);
   const outputRef = useRef<MIDIOutput | null>(null);
+  const [activeOutput, setActiveOutput] = useState<MIDIOutput | null>(null);
   const inputsRef = useRef<MIDIInput[]>([]);
 
   const clearInputs = useCallback(() => {
@@ -78,7 +79,17 @@ export function useMidiConnection() {
   const attachInputs = useCallback(async (access: MIDIAccess, output: MIDIOutput) => {
     clearInputs();
     const inputs = getInputsForOutput(access, output);
-    for (const input of inputs) {
+    const allInputs = [...access.inputs.values()];
+    const merged = new Map(inputs.map((i) => [i.id, i]));
+    for (const input of allInputs) {
+      if (
+        PORT_HINTS.some((h) => input.name?.toLowerCase().includes(h)) &&
+        !merged.has(input.id)
+      ) {
+        merged.set(input.id, input);
+      }
+    }
+    for (const input of merged.values()) {
       try {
         await openMidiPort(input);
       } catch {
@@ -102,6 +113,7 @@ export function useMidiConnection() {
         /* continue */
       }
       outputRef.current = output;
+      setActiveOutput(output);
       setSelectedOutputId(outputId);
       await attachInputs(access, output);
       midiParameterService.setOutput(output);
@@ -141,6 +153,7 @@ export function useMidiConnection() {
   const disconnect = useCallback(() => {
     clearInputs();
     outputRef.current = null;
+    setActiveOutput(null);
     accessRef.current = null;
     midiParameterService.setOutput(null);
     setConnected(false);
@@ -166,7 +179,7 @@ export function useMidiConnection() {
     inputPortName,
     sysexId,
     statusText,
-    output: outputRef.current,
+    output: activeOutput,
     inputs: inputsRef.current,
     connect,
     disconnect,

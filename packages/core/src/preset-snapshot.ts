@@ -83,7 +83,7 @@ export function encodePresetName(name: string): number[] {
   const norm = normalizePresetName(name);
   const bytes = new Array(15).fill(0);
   for (let i = 0; i < norm.length; i++) {
-    bytes[i] = norm.charCodeAt(i);
+    bytes[i] = norm.charCodeAt(i) & 0x7f;
   }
   return bytes;
 }

@@ -193,13 +193,24 @@ export class MidiParameterService {
     this.send(buildEditorMode(this.sysexId, 1));
   }
 
-  send(bytes: Uint8Array): void {
-    if (!this.output) return;
-    this.output.send(bytes);
+  hasOutput(): boolean {
+    return this.output != null;
+  }
+
+  /** Send raw SysEx (F0…F7). Returns false if no port or the driver rejects the message. */
+  send(bytes: Uint8Array): boolean {
+    if (!this.output) return false;
+    try {
+      this.output.send(Array.from(bytes));
+    } catch (err) {
+      console.error("MIDI SysEx send failed:", err);
+      return false;
+    }
     const hex = Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join(" ");
     for (const l of this.debugListeners) l("out", hex);
+    return true;
   }
 
   private dispatchActivePreset(info: ActivatedPresetInfo): void {

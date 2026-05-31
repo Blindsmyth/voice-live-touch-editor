@@ -246,7 +246,12 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     if (savePhase === "sending" || savePhase === "awaiting_ack") {
       presetTransferService.cancelSave();
     }
+    if (!midiParameterService.hasOutput()) {
+      setPresetStatus("MIDI output not connected — use Connect MIDI first.");
+      return;
+    }
     midiParameterService.enableEditorMode();
+    await new Promise((r) => setTimeout(r, 80));
     let header: Awaited<
       ReturnType<typeof presetTransferService.requestHeaderAndWait>
     > = null;
