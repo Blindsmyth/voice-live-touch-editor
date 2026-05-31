@@ -1,21 +1,21 @@
 # Voice Live Touch Editor
 
-Standalone macOS editor for the TC-Helicon **Voice Live Touch**, using MIDI SysEx. This repository is a proof of concept controlling **Harm Vol** (`Mixer_L Level Harmony`, parameter ID **193**). The architecture supports a future full editor and optional web build.
+Open-source macOS editor for the TC-Helicon **Voice Live Touch** (v1), using MIDI SysEx. Inspired by the commercial [VoiceLive Touch Editor](https://www.voiceliveeditor.com/index.php/editors) on VoiceLiveEditor.com, built with Electron + Web MIDI so a future web build can share the same core.
+
+## Features
+
+- **334 SysEx parameters** — 225 preset (live step) + 108 system/setup
+- Grouped sidebar (Harmony, Mixer, Delay, Reverb, …)
+- Search by name, label, or ID
+- Bidirectional edit: slider sends `0x22`, refresh requests `0x47`
+- Preset request (`0x45` preset 0) and notification parsing (`0x34`)
+- Debug hex view for MIDI troubleshooting
 
 ## Requirements
 
-- macOS with **Node.js 20+** and npm
-
-If `npm` is not found, install Node via Homebrew:
-
-```bash
-brew install node
-```
-
-Ensure `/opt/homebrew/bin` is on your PATH (Apple Silicon). Then open a **new terminal** tab.
-- Voice Live Touch connected via USB
-- MIDI enabled on the device
-- SysEx ID on the unit matching the app (default **0**, set under device MIDI/setup → `Utility SysEx_ID`)
+- macOS with **Node.js 20+** and npm (`brew install node`)
+- Voice Live Touch on USB, MIDI enabled
+- SysEx ID matching the device setup menu (default **0**)
 
 ## Quick start
 
@@ -24,38 +24,44 @@ npm install
 npm run dev
 ```
 
-Click **Connect MIDI**, choose the Voice Live Touch **output** port, and use the Harm Vol slider. On connect (and **Refresh**), the app requests the current value; moving the slider sends updates to the device.
+Connect MIDI → choose **Preset** or **System** scope → pick a group in the sidebar → edit parameters. Use **Refresh group** to read values from the device.
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Run Electron app with hot reload |
-| `npm run build` | Production build (`apps/desktop/out`) |
-| `npm run dist` | Build macOS `.dmg` / `.zip` (electron-builder) |
+| `npm run generate` | Regenerate parameter tables from [docs/VoiceLive-Touch-Sysex-Manual.md](docs/VoiceLive-Touch-Sysex-Manual.md) |
+| `npm run dev` | Electron dev with HMR |
+| `npm run build` | Production build |
+| `npm run dist` | macOS `.dmg` / `.zip` |
 
 ## Project layout
 
 ```
-packages/core/     SysEx pack/unpack, Harm Vol parameter definition
-apps/desktop/    Electron + React UI (Web MIDI)
-docs/              SysEx manual (PDF + Markdown)
-examples/          Reference Axoloti / Max editors
+packages/core/       SysEx, MidiParameterService, generated parameter registry
+packages/ui/         ParameterControl, ParameterPanel
+apps/desktop/        Electron shell (EditorShell)
+scripts/             generate-parameters.mjs
+docs/                SysEx manual (MD+PDF), user manual (MD+PDF)
+examples/            Reference Axoloti / Max editors
 ```
+
+## Documentation
+
+- [VoiceLive-Touch-Sysex-Manual.md](docs/VoiceLive-Touch-Sysex-Manual.md) — protocol and parameter IDs
+- [VoiceLive-Touch-User-Manual.md](docs/VoiceLive-Touch-User-Manual.md) — device UI context (German source PDF)
 
 ## MIDI troubleshooting
 
-- **No outputs listed** — Check USB cable, power, and that the device exposes a MIDI port to macOS (Audio MIDI Setup).
-- **Slider moves but device unchanged** — Verify **SysEx ID** matches the value in the device menu (0–127). Wrong ID is ignored by the unit.
-- **No readback on connect** — The app opens MIDI **input** ports explicitly (required for Web MIDI receive). Check the “MIDI input (listening)” line matches your device. Try **Refresh**. Enable **Editor Mode** is sent automatically on connect so the unit echoes parameter changes.
-- **SysEx permission** — The app requests `sysex: true` on Web MIDI; use the system prompt when connecting.
+- **No outputs** — check USB and Audio MIDI Setup
+- **Send works, no readback** — confirm MIDI **input** port; try Refresh group
+- **Wrong values** — verify SysEx ID matches device (`Utility SysEx_ID`, system param 858)
+- Enable **Debug hex** to compare with [examples/](examples/)
 
-## Protocol reference
+## Preset transfer (basic)
 
-See [docs/VoiceLive-Touch-Sysex-Manual.md](docs/VoiceLive-Touch-Sysex-Manual.md) for message formats and the full parameter tables.
-
-Harm Vol uses message `0x22` (set) and `0x47` (request), matching the reference patch in `examples/Voice Live Touch Sysex Editor.axp`.
+**Request preset** sends SysEx preset request for slot **0** (current edited step per manual). Full preset dump/load (`0x20`/`0x21` streams) is planned for a later release; notifications are already parsed.
 
 ## License
 
-Documentation © TC-Helicon (see PDF manual). Application code: use and modify as needed for personal/editor tooling.
+SysEx documentation © TC-Helicon. Application code: use and modify for personal/editor tooling.

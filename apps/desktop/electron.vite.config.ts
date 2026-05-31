@@ -13,6 +13,7 @@ export default defineConfig({
     resolve: {
       alias: {
         "@vlt/core": resolve(__dirname, "../../packages/core/src/index.ts"),
+        "@vlt/ui": resolve(__dirname, "../../packages/ui/src/index.ts"),
       },
     },
     plugins: [react()],

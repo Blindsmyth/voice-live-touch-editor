@@ -1,2 +1,8 @@
 export * from "./parameters.js";
 export * from "./sysex.js";
+export * from "./registry.js";
+export * from "./midi-parameter-service.js";
+export * from "./preset-transfer.js";
+export { presetParameters } from "./generated/preset-parameters.js";
+export { systemParameters } from "./generated/system-parameters.js";
+export { parameterGroups } from "./generated/parameter-groups.js";

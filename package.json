@@ -7,8 +7,9 @@
     "apps/*"
   ],
   "scripts": {
+    "generate": "node scripts/generate-parameters.mjs",
     "dev": "npm run dev -w @vlt/desktop",
-    "build": "npm run build -w @vlt/desktop",
+    "build": "npm run generate && npm run build -w @vlt/desktop",
     "dist": "npm run dist -w @vlt/desktop"
   }
 }

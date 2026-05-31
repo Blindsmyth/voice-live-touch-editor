@@ -3,10 +3,10 @@ import { join } from "node:path";
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
-    width: 480,
-    height: 420,
-    minWidth: 400,
-    minHeight: 360,
+    width: 960,
+    height: 720,
+    minWidth: 720,
+    minHeight: 500,
     title: "Voice Live Touch Editor",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
