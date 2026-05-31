@@ -18,7 +18,8 @@ import {
   encodePresetName,
   createEmptySnapshot,
 } from "./preset-snapshot.js";
-import { pack14, pack28, unpack14, unpack28 } from "./sysex.js";
+import { isValidSysexMessage, pack14, pack28, unpack14, unpack28 } from "./sysex.js";
+import { presetParameters } from "./generated/preset-parameters.js";
 
 function buildEnvelope(sysexId: number, messageId: number): number[] {
   return [0xf0, ...TC_HELICON_MANUFACTURER, sysexId, MODEL_ID, messageId];
@@ -222,6 +223,16 @@ export function buildPresetHeader(
   return new Uint8Array([...buildEnvelope(sysexId, MSG_PRESET_HEADER), ...payload, 0xf7]);
 }
 
+const offsetToPresetParam = new Map(
+  presetParameters.map((p) => [p.offset, p] as const)
+);
+
+function clampPresetValueAtOffset(offset: number, value: number): number {
+  const def = offsetToPresetParam.get(offset);
+  if (!def) return Math.round(value);
+  return Math.round(Math.max(def.min, Math.min(def.max, value)));
+}
+
 export function buildPresetData(
   sysexId: number,
   index: number,
@@ -231,8 +242,9 @@ export function buildPresetData(
   const dataBytes: number[] = [];
   for (let i = 0; i < PRESET_PARAMS_PER_MESSAGE; i++) {
     const offset = start + i;
-    const value =
+    const raw =
       offset < valuesByOffset.length ? valuesByOffset[offset] : 0;
+    const value = clampPresetValueAtOffset(offset, raw);
     const [v3, v2, v1, v0] = pack28(value);
     dataBytes.push(v3, v2, v1, v0);
   }
@@ -387,9 +399,21 @@ export class PresetTransferService {
     this.sysexId = Math.max(0, Math.min(127, Math.round(id)));
   }
 
-  setSendHandler(handler: (bytes: Uint8Array) => boolean): void {
-    this.sendOutput = handler;
+  setSendHandler(
+    handler: (bytes: Uint8Array) => boolean,
+    getError?: () => string | null
+  ): void {
+    this.sendOutput = (bytes) => {
+      const ok = handler(bytes);
+      if (!ok && getError) {
+        const detail = getError();
+        if (detail) this.lastSendFailDetail = detail;
+      }
+      return ok;
+    };
   }
+
+  private lastSendFailDetail: string | null = null;
 
   onState(listener: PresetTransferListener): () => void {
     this.listeners.add(listener);
@@ -677,10 +701,7 @@ export class PresetTransferService {
     }
 
     const msg = this.sendQueue.shift()!;
-    if (!this.sendOutput(msg)) {
-      this.failSave(
-        "MIDI send failed — check the output port in Connect and try again."
-      );
+    if (!this.sendPresetBytes(msg)) {
       return;
     }
 
@@ -710,6 +731,17 @@ export class PresetTransferService {
     this.sendQueue = [];
     this.phase = "idle";
     this.emit(message);
+  }
+
+  private sendPresetBytes(msg: Uint8Array): boolean {
+    if (!this.sendOutput) return false;
+    if (!isValidSysexMessage(msg)) {
+      this.failSave(
+        "Preset SysEx encoding error (invalid byte >127) — try Load from device again."
+      );
+      return false;
+    }
+    return this.sendOutput(msg);
   }
 
   reset(): void {

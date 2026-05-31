@@ -4,6 +4,7 @@ import {
   buildRequestParameter,
   buildSetParameter,
   createSysexAssembler,
+  isValidSysexMessage,
   parseActivatedPresetInfo,
   parseParameterResponse,
   type ActivatedPresetInfo,
@@ -31,13 +32,17 @@ export class MidiParameterService {
   private activePresetListeners = new Set<ActivePresetListener>();
   private debounceTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private suppressSend = false;
+  private lastSendError: string | null = null;
   private assembler = createSysexAssembler((bytes) => this.handleSysex(bytes));
   private activePresetWaiters: Array<{
     resolve: (info: ActivatedPresetInfo | null) => void;
   }> = [];
 
   constructor() {
-    presetTransferService.setSendHandler((bytes) => this.send(bytes));
+    presetTransferService.setSendHandler(
+      (bytes) => this.send(bytes),
+      () => this.getLastSendError()
+    );
   }
 
   setOutput(output: MIDIOutput | null): void {
@@ -197,14 +202,49 @@ export class MidiParameterService {
     return this.output != null;
   }
 
+  getLastSendError(): string | null {
+    return this.lastSendError;
+  }
+
+  /** Cancel pending debounced parameter sends before a bulk preset transfer. */
+  flushPendingSends(): void {
+    for (const timer of this.debounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.debounceTimers.clear();
+  }
+
   /** Send raw SysEx (F0…F7). Returns false if no port or the driver rejects the message. */
   send(bytes: Uint8Array): boolean {
-    if (!this.output) return false;
-    try {
-      this.output.send(Array.from(bytes));
-    } catch (err) {
-      console.error("MIDI SysEx send failed:", err);
+    this.lastSendError = null;
+    if (!this.output) {
+      this.lastSendError = "No MIDI output port";
       return false;
+    }
+    if (!isValidSysexMessage(bytes)) {
+      const bad = Array.from(bytes).findIndex((b, i) => i > 0 && i < bytes.length - 1 && b > 127);
+      this.lastSendError =
+        bad >= 0
+          ? `Invalid SysEx data byte ${bytes[bad]} at position ${bad} (must be 0–127)`
+          : "Invalid SysEx message";
+      console.error(this.lastSendError, bytes);
+      return false;
+    }
+    const data = Array.from(bytes);
+    try {
+      this.output.send(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.lastSendError = msg;
+      console.error("MIDI SysEx send failed:", err);
+      try {
+        this.output.send(new Uint8Array(bytes));
+      } catch (err2) {
+        const msg2 = err2 instanceof Error ? err2.message : String(err2);
+        this.lastSendError = msg2;
+        console.error("MIDI SysEx send retry failed:", err2);
+        return false;
+      }
     }
     const hex = Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, "0"))

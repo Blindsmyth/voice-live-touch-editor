@@ -250,6 +250,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       setPresetStatus("MIDI output not connected — use Connect MIDI first.");
       return;
     }
+    midiParameterService.flushPendingSends();
     midiParameterService.enableEditorMode();
     await new Promise((r) => setTimeout(r, 80));
     let header: Awaited<

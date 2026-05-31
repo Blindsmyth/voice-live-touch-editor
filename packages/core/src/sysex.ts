@@ -51,27 +51,44 @@ export function parseActivatedPresetInfo(
   return null;
 }
 
-/** Pack a signed value into two 7-bit SysEx bytes (14-bit). */
+/** Pack a signed value into two 7-bit SysEx bytes (14-bit), inverse of unpack14. */
 export function pack14(value: number): [number, number] {
   let temp = value;
-  if (value < 0) {
-    temp = 16384 + value;
-  }
-  const msb = Math.floor(temp / 128);
-  const lsb = temp - msb * 128;
-  return [msb, lsb];
+  if (value < 0) temp = 16384 + value;
+  temp = Math.round(temp) & 0x3fff;
+  return [(temp >> 7) & 0x7f, temp & 0x7f];
 }
 
-/** Pack a signed value into four 7-bit SysEx bytes (28-bit), matching the Axoloti reference editor. */
+/**
+ * Pack a signed 28-bit value into four 7-bit SysEx bytes (inverse of unpack28).
+ * All returned bytes are 0–127 (required by Web MIDI SysEx send).
+ */
 export function pack28(value: number): [number, number, number, number] {
-  if (value < 0) {
+  if (value < 0 && value >= -128) {
     return [31, 127, 127, 128 + value];
   }
-  const msb3 = Math.floor(value / 2097152);
-  const msb2 = Math.floor(value / 16384);
-  const msb = Math.floor(value / 128);
-  const lsb = value - (msb * 128 + msb2 * 16384 + msb3 * 2097152);
-  return [msb3, msb2, msb, lsb];
+  let raw = Math.round(value);
+  if (raw < 0) {
+    raw = (1 << 28) + raw;
+  }
+  raw &= 0xfffffff;
+  return [
+    (raw >> 21) & 0x7f,
+    (raw >> 14) & 0x7f,
+    (raw >> 7) & 0x7f,
+    raw & 0x7f,
+  ];
+}
+
+/** True if a complete F0…F7 message is valid for Web MIDI (data bytes ≤ 127). */
+export function isValidSysexMessage(bytes: Uint8Array): boolean {
+  if (bytes.length < 2 || bytes[0] !== 0xf0 || bytes[bytes.length - 1] !== 0xf7) {
+    return false;
+  }
+  for (let i = 1; i < bytes.length - 1; i++) {
+    if (bytes[i] > 127) return false;
+  }
+  return true;
 }
 
 /** Unpack four 7-bit bytes into a signed 28-bit value. */
