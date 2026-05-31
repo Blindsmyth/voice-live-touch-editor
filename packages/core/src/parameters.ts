@@ -45,4 +45,5 @@ export const MSG_REQUEST_PRESET = 0x45;
 export const MSG_REQUEST_PRESET_HEADER = 0x46;
 export const MSG_PRESET_HEADER = 0x20;
 export const MSG_PRESET_DATA = 0x21;
+export const MSG_ACTIVATED_PRESET_INFO = 0x23;
 export const MSG_NOTIFICATION = 0x34;

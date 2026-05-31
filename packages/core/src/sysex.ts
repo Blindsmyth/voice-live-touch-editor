@@ -1,10 +1,55 @@
 import {
   MODEL_ID,
+  MSG_ACTIVATED_PRESET_INFO,
   MSG_EDITOR_MODE,
   MSG_PARAMETER_DATA,
   MSG_REQUEST_PARAMETER,
   TC_HELICON_MANUFACTURER,
 } from "./parameters.js";
+
+export interface ActivatedPresetInfo {
+  presetNumber: number;
+  step: number;
+}
+
+/** Editor mode 3 — device responds with Activated Preset Info (0x23). */
+export function buildRequestActivatedPresetInfo(sysexId: number): Uint8Array {
+  return buildEditorMode(sysexId, 3);
+}
+
+/** Parse Activated Preset Info (0x23): active preset number + step. */
+export function parseActivatedPresetInfo(
+  data: Uint8Array,
+  expectedSysexId?: number
+): ActivatedPresetInfo | null {
+  let start = 0;
+  let end = data.length;
+  if (data[0] === 0xf0) start = 1;
+  if (data.length > 0 && data[data.length - 1] === 0xf7) end = data.length - 1;
+  const body = data.subarray(start, end);
+
+  for (let i = 0; i <= body.length - 10; i++) {
+    if (
+      body[i] !== TC_HELICON_MANUFACTURER[0] ||
+      body[i + 1] !== TC_HELICON_MANUFACTURER[1] ||
+      body[i + 2] !== TC_HELICON_MANUFACTURER[2]
+    ) {
+      continue;
+    }
+    const sysexId = body[i + 3];
+    const modelId = body[i + 4];
+    const messageId = body[i + 5];
+    if (modelId !== MODEL_ID && modelId !== 91) continue;
+    if (messageId !== MSG_ACTIVATED_PRESET_INFO) continue;
+    if (expectedSysexId !== undefined && sysexId !== expectedSysexId) continue;
+    if (i + 9 > body.length) return null;
+    return {
+      presetNumber: unpack14(body[i + 6], body[i + 7]),
+      step: body[i + 8] & 0x7f,
+    };
+  }
+  return null;
+}
 
 /** Pack a signed value into two 7-bit SysEx bytes (14-bit). */
 export function pack14(value: number): [number, number] {

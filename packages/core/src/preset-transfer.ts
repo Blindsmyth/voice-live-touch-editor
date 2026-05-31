@@ -10,8 +10,8 @@ import {
 import {
   PRESET_DATA_MESSAGE_COUNT,
   PRESET_PARAMS_PER_MESSAGE,
-  PRESET_PARAMETER_VERSION,
   PRESET_VALUE_COUNT,
+  resolvePresetVersion,
   type PresetSnapshot,
   decodePresetName,
   encodePresetName,
@@ -348,6 +348,8 @@ export class PresetTransferService {
   private sendQueue: Uint8Array[] = [];
   private sendTimer: ReturnType<typeof setTimeout> | null = null;
   private ackTimeout: ReturnType<typeof setTimeout> | null = null;
+  /** Last preset version seen from a device header (for saves without full load). */
+  private devicePresetVersion: number | null = null;
 
   setSysexId(id: number): void {
     this.sysexId = Math.max(0, Math.min(127, Math.round(id)));
@@ -368,6 +370,10 @@ export class PresetTransferService {
 
   getSnapshot(): PresetSnapshot | null {
     return this.snapshot;
+  }
+
+  getDevicePresetVersion(): number | null {
+    return this.devicePresetVersion;
   }
 
   private emit(status: string): void {
@@ -402,6 +408,9 @@ export class PresetTransferService {
     this.snapshot.name = header.name;
     this.snapshot.tags = header.tags;
     this.snapshot.stepCount = header.stepCount;
+    if (header.version > 0) {
+      this.devicePresetVersion = header.version;
+    }
   }
 
   handleSysex(data: Uint8Array): boolean {
@@ -475,8 +484,10 @@ export class PresetTransferService {
     const snap: PresetSnapshot = {
       ...snapshot,
       valuesByOffset: [...snapshot.valuesByOffset],
-      version:
-        snapshot.version > 0 ? snapshot.version : PRESET_PARAMETER_VERSION,
+      version: resolvePresetVersion(
+        snapshot.version,
+        this.devicePresetVersion
+      ),
       stepCount: Math.max(1, snapshot.stepCount || 1),
       name: snapshot.name || "",
     };

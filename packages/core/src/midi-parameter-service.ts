@@ -1,9 +1,12 @@
 import {
   buildEditorMode,
+  buildRequestActivatedPresetInfo,
   buildRequestParameter,
   buildSetParameter,
   createSysexAssembler,
+  parseActivatedPresetInfo,
   parseParameterResponse,
+  type ActivatedPresetInfo,
 } from "./sysex.js";
 import {
   parseNotification,
@@ -12,9 +15,11 @@ import {
 } from "./preset-transfer.js";
 import { getParameter } from "./registry.js";
 
+export type { ActivatedPresetInfo };
 export type ParameterListener = (id: number, value: number) => void;
 export type SysexDebugListener = (direction: "in" | "out", hex: string) => void;
 export type NotificationListener = (code: NotificationCode) => void;
+export type ActivePresetListener = (info: ActivatedPresetInfo) => void;
 
 export class MidiParameterService {
   private output: MIDIOutput | null = null;
@@ -23,9 +28,13 @@ export class MidiParameterService {
   private listeners = new Set<ParameterListener>();
   private debugListeners = new Set<SysexDebugListener>();
   private notificationListeners = new Set<NotificationListener>();
+  private activePresetListeners = new Set<ActivePresetListener>();
   private debounceTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private suppressSend = false;
   private assembler = createSysexAssembler((bytes) => this.handleSysex(bytes));
+  private activePresetWaiters: Array<{
+    resolve: (info: ActivatedPresetInfo | null) => void;
+  }> = [];
 
   constructor() {
     presetTransferService.setSendHandler((bytes) => this.send(bytes));
@@ -61,6 +70,34 @@ export class MidiParameterService {
   onNotification(listener: NotificationListener): () => void {
     this.notificationListeners.add(listener);
     return () => this.notificationListeners.delete(listener);
+  }
+
+  onActivePreset(listener: ActivePresetListener): () => void {
+    this.activePresetListeners.add(listener);
+    return () => this.activePresetListeners.delete(listener);
+  }
+
+  /**
+   * Ask the device which preset/step is active (Editor Mode 3 → 0x23).
+   */
+  requestActivePreset(timeoutMs = 800): Promise<ActivatedPresetInfo | null> {
+    return new Promise((resolve) => {
+      const waiter = { resolve };
+      this.activePresetWaiters.push(waiter);
+      this.send(buildRequestActivatedPresetInfo(this.sysexId));
+      const timer = setTimeout(() => {
+        const idx = this.activePresetWaiters.indexOf(waiter);
+        if (idx >= 0) {
+          this.activePresetWaiters.splice(idx, 1);
+          resolve(null);
+        }
+      }, timeoutMs);
+      const original = waiter.resolve;
+      waiter.resolve = (info) => {
+        clearTimeout(timer);
+        original(info);
+      };
+    });
   }
 
   handleMidiMessage(event: MIDIMessageEvent): void {
@@ -154,6 +191,12 @@ export class MidiParameterService {
     for (const l of this.debugListeners) l("out", hex);
   }
 
+  private dispatchActivePreset(info: ActivatedPresetInfo): void {
+    for (const l of this.activePresetListeners) l(info);
+    const waiters = this.activePresetWaiters.splice(0);
+    for (const w of waiters) w.resolve(info);
+  }
+
   private handleSysex(bytes: Uint8Array): void {
     const hex = Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -165,6 +208,14 @@ export class MidiParameterService {
     if (notif) {
       presetTransferService.handleNotification(notif);
       for (const l of this.notificationListeners) l(notif);
+      return;
+    }
+
+    const active =
+      parseActivatedPresetInfo(bytes, this.sysexId) ??
+      parseActivatedPresetInfo(bytes);
+    if (active) {
+      this.dispatchActivePreset(active);
       return;
     }
 

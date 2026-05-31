@@ -1,7 +1,20 @@
 import { presetParameters } from "./generated/preset-parameters.js";
 
-/** Parameter set version 0.26 (manual) — 14-bit packed value 26. */
-export const PRESET_PARAMETER_VERSION = 26;
+/**
+ * Parameter set version 0.26 from the SysEx manual (hex-style id).
+ * On the wire this is 14-bit packed value 38 (0x26), not decimal 26.
+ */
+export const PRESET_PARAMETER_VERSION = 0x26;
+
+/** Resolve version for save: prefer loaded header, then device default. */
+export function resolvePresetVersion(
+  snapshotVersion: number,
+  deviceVersion: number | null
+): number {
+  if (snapshotVersion > 0) return snapshotVersion;
+  if (deviceVersion != null && deviceVersion > 0) return deviceVersion;
+  return PRESET_PARAMETER_VERSION;
+}
 
 export const PRESET_VALUE_COUNT = 226;
 export const PRESET_PARAMS_PER_MESSAGE = 25;
@@ -92,7 +105,9 @@ export function buildSnapshotFromLiveValues(
 ): PresetSnapshot {
   const snap = createEmptySnapshot(presetNumber);
   snap.name = normalizePresetName(name);
-  if (partial?.version != null) snap.version = partial.version;
+  if (partial?.version != null && partial.version > 0) {
+    snap.version = partial.version;
+  }
   if (partial?.tags != null) snap.tags = partial.tags;
   if (partial?.stepCount != null) snap.stepCount = partial.stepCount;
   return mergeLiveValuesIntoSnapshot(snap, liveValues);

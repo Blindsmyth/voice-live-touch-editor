@@ -20,6 +20,7 @@ import {
   cloneSnapshot,
   buildSnapshotFromLiveValues,
   canSaveToPresetSlot,
+  resolvePresetVersion,
   snapshotToLiveValues,
   snapshotToJson,
   snapshotFromJson,
@@ -178,11 +179,29 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     );
   }, [conn.connected, searchQuery, scope]);
 
-  const loadPresetFromDevice = useCallback(() => {
+  const loadPresetFromDevice = useCallback(async () => {
     if (!conn.connected) return;
     setHasLoadedSnapshot(false);
     loadedSnapshotRef.current = null;
-    presetTransferService.requestPreset(presetSlot);
+    midiParameterService.enableEditorMode();
+    setPresetStatus("Reading active preset on device…");
+    const active = await midiParameterService.requestActivePreset();
+    const targetSlot = active?.presetNumber ?? presetSlot;
+    if (active && active.presetNumber >= 0) {
+      setPresetSlot(active.presetNumber);
+      setPresetStatus(
+        `Device: preset ${active.presetNumber}, step ${active.step + 1} — loading live edit…`
+      );
+    } else {
+      setPresetStatus("Loading live edit (preset 0)…");
+    }
+    presetTransferService.requestPreset(0);
+    if (active && active.presetNumber >= 1) {
+      setTimeout(
+        () => presetTransferService.requestPresetHeaderOnly(active.presetNumber),
+        100
+      );
+    }
   }, [conn.connected, presetSlot]);
 
   const savePresetToDevice = useCallback(() => {
@@ -199,12 +218,14 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       loadedSnapshotRef.current ??
       (svcSnap ? cloneSnapshot(svcSnap) : null);
     if (!base && live.size >= 20) {
-      base = buildSnapshotFromLiveValues(
-        presetSlot,
-        presetName,
-        live,
-        svcSnap ?? undefined
-      );
+      base = buildSnapshotFromLiveValues(presetSlot, presetName, live, {
+        version: resolvePresetVersion(
+          svcSnap?.version ?? 0,
+          presetTransferService.getDevicePresetVersion()
+        ),
+        tags: svcSnap?.tags,
+        stepCount: svcSnap?.stepCount,
+      });
     }
     if (!base) {
       setPresetStatus(
@@ -218,6 +239,10 @@ export function MidiProvider({ children }: { children: ReactNode }) {
         ...base,
         number: presetSlot,
         name: normalizePresetName(presetName),
+        version: resolvePresetVersion(
+          base.version,
+          presetTransferService.getDevicePresetVersion()
+        ),
       },
       live
     );

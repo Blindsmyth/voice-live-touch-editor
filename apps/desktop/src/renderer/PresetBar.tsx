@@ -68,7 +68,7 @@ export function PresetBar({
         disabled={!connected}
         onClick={onLoad}
       >
-        Load from device
+        Load (detect slot)
       </button>
       <button
         type="button"
