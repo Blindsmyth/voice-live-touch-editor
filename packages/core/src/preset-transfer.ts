@@ -140,8 +140,7 @@ export function parsePresetHeader(
       return parsePresetHeader(data);
     }
     const body = stripSysexBody(data);
-    const rel = msg.payloadStart - (data[0] === 0xf0 ? 1 : 0);
-    return parsePresetHeaderAt(body, rel);
+    return parsePresetHeaderAt(body, msg.payloadStart);
   }
 
   const body = stripSysexBody(data);
@@ -170,13 +169,12 @@ export function parsePresetData(
 ): ParsedPresetData | null {
   const msg = findMessageBody(data);
   if (!msg || msg.messageId !== MSG_PRESET_DATA) return null;
-  if (expectedSysexId !== undefined && msg.sysexId !== expectedSysexId) return null;
+  if (expectedSysexId !== undefined && msg.sysexId !== expectedSysexId) {
+    return parsePresetData(data);
+  }
 
-  const body = data.subarray(
-    data[0] === 0xf0 ? 1 : 0,
-    data[data.length - 1] === 0xf7 ? data.length - 1 : data.length
-  );
-  const rel = msg.payloadStart - (data[0] === 0xf0 ? 1 : 0);
+  const body = stripSysexBody(data);
+  const rel = msg.payloadStart;
   if (rel + 102 > body.length) return null;
 
   const index = body[rel];
@@ -344,18 +342,32 @@ export type PresetTransferListener = (state: {
   phase: PresetTransferPhase;
   snapshot: PresetSnapshot | null;
   status: string;
+  headerReceived?: boolean;
 }) => void;
+
+/** True when all preset data chunks (0x21) for a full dump have arrived. */
+export function isPresetDataComplete(received: Set<number>): boolean {
+  const lastIndex = PRESET_DATA_MESSAGE_COUNT - 1;
+  if (received.has(lastIndex)) return true;
+  if (received.size >= PRESET_DATA_MESSAGE_COUNT) return true;
+  for (let i = 0; i < lastIndex; i++) {
+    if (!received.has(i)) return false;
+  }
+  return received.size >= lastIndex;
+}
 
 export class PresetTransferService {
   private sysexId = 0;
   private phase: PresetTransferPhase = "idle";
   private snapshot: PresetSnapshot | null = null;
   private receivedData = new Set<number>();
+  private headerReceived = false;
   private listeners = new Set<PresetTransferListener>();
   private sendOutput: ((bytes: Uint8Array) => void) | null = null;
   private sendQueue: Uint8Array[] = [];
   private sendTimer: ReturnType<typeof setTimeout> | null = null;
   private ackTimeout: ReturnType<typeof setTimeout> | null = null;
+  private receiveTimeout: ReturnType<typeof setTimeout> | null = null;
   private deviceVersionWire: [number, number] = [...DEFAULT_VERSION_WIRE];
   private headerWaiters: Array<{
     resolve: (header: ParsedPresetHeader | null) => void;
@@ -386,23 +398,48 @@ export class PresetTransferService {
     return [...this.deviceVersionWire];
   }
 
-  private emit(status: string): void {
+  private emit(status: string, headerReceived = this.headerReceived): void {
     for (const l of this.listeners) {
-      l({ phase: this.phase, snapshot: this.snapshot, status });
+      l({
+        phase: this.phase,
+        snapshot: this.snapshot,
+        status,
+        headerReceived,
+      });
     }
   }
 
+  /** Abort a stuck receive so Save / a new Load can proceed. */
+  cancelReceive(): void {
+    if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+    this.receiveTimeout = null;
+    if (this.phase !== "receiving") return;
+    this.phase = "idle";
+    this.receivedData.clear();
+    this.headerReceived = false;
+    this.emit("Preset load cancelled.");
+  }
+
   requestPreset(presetNumber: number): void {
+    if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
     this.phase = "receiving";
+    this.headerReceived = false;
     this.snapshot = createEmptySnapshot(presetNumber);
     this.receivedData.clear();
     this.emit(`Requesting preset ${presetNumber}…`);
     this.sendOutput?.(buildRequestPreset(this.sysexId, presetNumber));
-    setTimeout(() => {
-      if (this.phase === "receiving") {
-        this.sendOutput?.(buildRequestPresetHeader(this.sysexId, presetNumber));
+    this.receiveTimeout = setTimeout(() => {
+      if (this.phase !== "receiving") return;
+      if (this.headerReceived && this.receivedData.size > 0) {
+        this.finishReceiving();
+        return;
       }
-    }, 120);
+      this.phase = "idle";
+      this.headerReceived = false;
+      this.emit(
+        "Preset load timed out — check MIDI input routing and SysEx ID, then try Load again."
+      );
+    }, 15000);
   }
 
   requestPresetHeaderOnly(presetNumber: number): void {
@@ -421,6 +458,7 @@ export class PresetTransferService {
     this.snapshot.tags = header.tags;
     this.snapshot.stepCount = header.stepCount;
     this.deviceVersionWire = [...header.versionWire];
+    this.headerReceived = true;
     const waiters = this.headerWaiters.splice(0);
     for (const w of waiters) w.resolve(header);
   }
@@ -469,13 +507,12 @@ export class PresetTransferService {
         }
       });
       this.receivedData.add(chunk.index);
-      const dataComplete =
-        this.receivedData.size >= PRESET_DATA_MESSAGE_COUNT ||
-        (this.receivedData.size >= 9 && this.receivedData.has(9));
-      if (dataComplete && this.phase === "receiving") {
+      if (isPresetDataComplete(this.receivedData) && this.phase === "receiving") {
         this.finishReceiving();
       } else {
-        this.emit(`Preset data ${chunk.index + 1}/${PRESET_DATA_MESSAGE_COUNT}`);
+        this.emit(
+          `Preset data ${this.receivedData.size}/${PRESET_DATA_MESSAGE_COUNT} (chunk ${chunk.index + 1})`
+        );
       }
       return true;
     }
@@ -484,6 +521,8 @@ export class PresetTransferService {
 
   private finishReceiving(): void {
     if (!this.snapshot || this.phase !== "receiving") return;
+    if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+    this.receiveTimeout = null;
     this.phase = "complete";
     this.emit(
       `Preset ${this.snapshot.number} loaded (${this.snapshot.name || "unnamed"})`
@@ -500,7 +539,11 @@ export class PresetTransferService {
         );
         return;
       }
-      if (this.phase === "receiving" && this.snapshot) {
+      if (
+        this.phase === "receiving" &&
+        this.snapshot &&
+        isPresetDataComplete(this.receivedData)
+      ) {
         this.finishReceiving();
       }
     } else if (this.phase === "sending" || this.phase === "awaiting_ack") {
@@ -571,9 +614,12 @@ export class PresetTransferService {
   reset(): void {
     if (this.sendTimer) clearTimeout(this.sendTimer);
     if (this.ackTimeout) clearTimeout(this.ackTimeout);
+    if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+    this.receiveTimeout = null;
     this.phase = "idle";
     this.snapshot = null;
     this.receivedData.clear();
+    this.headerReceived = false;
     this.sendQueue = [];
     this.emit("Idle");
   }

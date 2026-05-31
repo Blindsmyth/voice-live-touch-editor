@@ -114,17 +114,22 @@ export function MidiProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    return presetTransferService.onState(({ phase, snapshot, status }) => {
+    return presetTransferService.onState(({ phase, snapshot, status, headerReceived }) => {
       setPresetStatus(status);
       if (snapshot?.name) {
         setPresetName(snapshot.name);
       }
+      if (
+        snapshot &&
+        snapshot.number >= 1 &&
+        snapshot.number <= 300 &&
+        (headerReceived || phase === "complete")
+      ) {
+        setPresetSlot(snapshot.number);
+      }
       if (phase === "complete" && snapshot) {
         loadedSnapshotRef.current = cloneSnapshot(snapshot);
         setHasLoadedSnapshot(true);
-        if (snapshot.number >= 1 && snapshot.number <= 300) {
-          setPresetSlot(snapshot.number);
-        }
         midiParameterService.applySnapshotValues(snapshotToLiveValues(snapshot));
         workspaceStore.upsert(snapshot, false);
         setWorkspaceTick((t) => t + 1);
@@ -190,6 +195,9 @@ export function MidiProvider({ children }: { children: ReactNode }) {
 
   const loadPresetFromDevice = useCallback(async () => {
     if (!conn.connected) return;
+    if (presetTransferService.getPhase() === "receiving") {
+      presetTransferService.cancelReceive();
+    }
     setHasLoadedSnapshot(false);
     loadedSnapshotRef.current = null;
     midiParameterService.enableEditorMode();
@@ -231,11 +239,11 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       );
       return;
     }
-    if (
-      presetTransferService.getPhase() === "receiving" ||
-      presetTransferService.getPhase() === "sending"
-    ) {
-      setPresetStatus("Wait until the current preset transfer finishes.");
+    if (presetTransferService.getPhase() === "receiving") {
+      presetTransferService.cancelReceive();
+    }
+    if (presetTransferService.getPhase() === "sending") {
+      setPresetStatus("Wait until the current save finishes.");
       return;
     }
     midiParameterService.enableEditorMode();
