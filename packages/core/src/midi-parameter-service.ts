@@ -5,7 +5,11 @@ import {
   createSysexAssembler,
   parseParameterResponse,
 } from "./sysex.js";
-import { parseNotification, type NotificationCode } from "./preset-transfer.js";
+import {
+  parseNotification,
+  presetTransferService,
+  type NotificationCode,
+} from "./preset-transfer.js";
 import { getParameter } from "./registry.js";
 
 export type ParameterListener = (id: number, value: number) => void;
@@ -23,16 +27,25 @@ export class MidiParameterService {
   private suppressSend = false;
   private assembler = createSysexAssembler((bytes) => this.handleSysex(bytes));
 
+  constructor() {
+    presetTransferService.setSendHandler((bytes) => this.send(bytes));
+  }
+
   setOutput(output: MIDIOutput | null): void {
     this.output = output;
   }
 
   setSysexId(id: number): void {
     this.sysexId = Math.max(0, Math.min(127, Math.round(id)));
+    presetTransferService.setSysexId(this.sysexId);
   }
 
   getSysexId(): number {
     return this.sysexId;
+  }
+
+  getValuesMap(): Map<number, number> {
+    return this.values;
   }
 
   onParameter(listener: ParameterListener): () => void {
@@ -112,11 +125,27 @@ export class MidiParameterService {
     }, 150);
   }
 
+  applySnapshotValues(pairs: { id: number; value: number }[]): void {
+    this.suppressSend = true;
+    for (const { id, value } of pairs) {
+      const def = getParameter(id);
+      if (!def) continue;
+      const clamped = Math.round(
+        Math.max(def.min, Math.min(def.max, value))
+      );
+      this.values.set(id, clamped);
+      for (const l of this.listeners) l(id, clamped);
+    }
+    setTimeout(() => {
+      this.suppressSend = false;
+    }, 200);
+  }
+
   enableEditorMode(): void {
     this.send(buildEditorMode(this.sysexId, 1));
   }
 
-  private send(bytes: Uint8Array): void {
+  send(bytes: Uint8Array): void {
     if (!this.output) return;
     this.output.send(bytes);
     const hex = Array.from(bytes)
@@ -132,10 +161,14 @@ export class MidiParameterService {
     for (const l of this.debugListeners) l("in", hex);
 
     const notif =
-      parseNotification(bytes, this.sysexId) ??
-      parseNotification(bytes, 0);
+      parseNotification(bytes, this.sysexId) ?? parseNotification(bytes);
     if (notif) {
+      presetTransferService.handleNotification(notif);
       for (const l of this.notificationListeners) l(notif);
+      return;
+    }
+
+    if (presetTransferService.handleSysex(bytes)) {
       return;
     }
 

@@ -1,4 +1,4 @@
-import type { ParameterDef } from "@vlt/core";
+import { enumLabel, type ParameterDef } from "@vlt/core";
 
 export interface ParameterControlProps {
   param: ParameterDef;
@@ -32,6 +32,26 @@ export function ParameterControl({
     );
   }
 
+  const options = param.options;
+  if (options?.length) {
+    return (
+      <div className="vlt-param-control vlt-param-select">
+        <select
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(Number(e.target.value))}
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span className="vlt-param-value vlt-enum-hint">{value}</span>
+      </div>
+    );
+  }
+
   return (
     <div className="vlt-param-control">
       <input
@@ -44,8 +64,7 @@ export function ParameterControl({
         onInput={(e) => onChange(Number(e.currentTarget.value))}
       />
       <span className="vlt-param-value">
-        {value}
-        {unit}
+        {param.options ? enumLabel(param.id, value) : `${value}${unit}`}
       </span>
     </div>
   );

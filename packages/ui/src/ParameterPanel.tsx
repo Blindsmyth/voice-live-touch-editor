@@ -32,10 +32,12 @@ export function ParameterPanel({
   return (
     <div className="vlt-panel">
       {bySubgroup.map(([sub, params]) => (
-        <details key={sub} className="vlt-subgroup" open={bySubgroup.length <= 3}>
-          <summary>
-            {sub} <span className="vlt-count">({params.length})</span>
-          </summary>
+        <section key={sub} className="vlt-subgroup-section">
+          {bySubgroup.length > 1 && (
+            <h3 className="vlt-subgroup-heading">
+              {sub} <span className="vlt-count">({params.length})</span>
+            </h3>
+          )}
           <ul className="vlt-param-list">
             {params.map((param) => (
               <li key={param.id} className="vlt-param-row">
@@ -54,7 +56,7 @@ export function ParameterPanel({
               </li>
             ))}
           </ul>
-        </details>
+        </section>
       ))}
     </div>
   );

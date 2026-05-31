@@ -4,17 +4,29 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
   midiParameterService,
-  buildRequestPreset,
+  presetTransferService,
   NOTIFICATION_LABELS,
   getParametersForGroup,
   searchParameters,
   parameterGroups,
+  PresetWorkspace,
+  mergeLiveValuesIntoSnapshot,
+  cloneSnapshot,
+  buildSnapshotFromLiveValues,
+  canSaveToPresetSlot,
+  snapshotToLiveValues,
+  snapshotToJson,
+  snapshotFromJson,
+  importSyx,
+  normalizePresetName,
   type ParameterScope,
+  type PresetSnapshot,
 } from "@vlt/core";
 import { useMidiConnection } from "../hooks/useMidiConnection.js";
 
@@ -30,17 +42,36 @@ interface MidiContextValue {
   setValue: (id: number, value: number) => void;
   refreshGroup: () => void;
   refreshSearch: () => void;
-  requestLivePreset: () => void;
+  presetSlot: number;
+  setPresetSlot: (n: number) => void;
+  presetName: string;
+  setPresetName: (n: string) => void;
+  loadPresetFromDevice: () => void;
+  savePresetToDevice: () => void;
   presetStatus: string;
+  hasLoadedSnapshot: boolean;
   showDebug: boolean;
   setShowDebug: (v: boolean) => void;
   lastIn: string | null;
   lastOut: string | null;
   visibleParameters: ReturnType<typeof getParametersForGroup>;
   groups: typeof parameterGroups;
+  workspace: ReturnType<PresetWorkspace["list"]>;
+  backups: string[];
+  libraryStatus: string;
+  selectedWorkspaceSlot: number | null;
+  setSelectedWorkspaceSlot: (n: number | null) => void;
+  backupWorkspace: () => void;
+  exportSelectedPreset: () => void;
+  importPresetFile: () => void;
+  sendWorkspaceToDevice: () => void;
+  refreshBackups: () => void;
+  mainView: "editor" | "library";
+  setMainView: (v: "editor" | "library") => void;
 }
 
 const MidiContext = createContext<MidiContextValue | null>(null);
+const workspaceStore = new PresetWorkspace();
 
 export function MidiProvider({ children }: { children: ReactNode }) {
   const conn = useMidiConnection();
@@ -52,6 +83,15 @@ export function MidiProvider({ children }: { children: ReactNode }) {
   const [lastIn, setLastIn] = useState<string | null>(null);
   const [lastOut, setLastOut] = useState<string | null>(null);
   const [presetStatus, setPresetStatus] = useState("");
+  const [presetSlot, setPresetSlot] = useState(0);
+  const [presetName, setPresetName] = useState("");
+  const [hasLoadedSnapshot, setHasLoadedSnapshot] = useState(false);
+  const [workspaceTick, setWorkspaceTick] = useState(0);
+  const [backups, setBackups] = useState<string[]>([]);
+  const [libraryStatus, setLibraryStatus] = useState("");
+  const [selectedWorkspaceSlot, setSelectedWorkspaceSlot] = useState<number | null>(null);
+  const [mainView, setMainView] = useState<"editor" | "library">("editor");
+  const loadedSnapshotRef = useRef<PresetSnapshot | null>(null);
 
   useEffect(() => {
     midiParameterService.setOutput(conn.output);
@@ -72,6 +112,33 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     return unsub;
   }, []);
 
+  useEffect(() => {
+    return presetTransferService.onState(({ phase, snapshot, status }) => {
+      setPresetStatus(status);
+      if (snapshot?.name) {
+        setPresetName(snapshot.name);
+      }
+      if (phase === "complete" && snapshot) {
+        loadedSnapshotRef.current = cloneSnapshot(snapshot);
+        setHasLoadedSnapshot(true);
+        setPresetSlot(snapshot.number);
+        midiParameterService.applySnapshotValues(snapshotToLiveValues(snapshot));
+        workspaceStore.upsert(snapshot, false);
+        setWorkspaceTick((t) => t + 1);
+        setTick((t) => t + 1);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!conn.connected) return;
+    return midiParameterService.onNotification((code) => {
+      if (code !== 1) {
+        setPresetStatus(NOTIFICATION_LABELS[code] ?? `Notification ${code}`);
+      }
+    });
+  }, [conn.connected]);
+
   const visibleParameters = useMemo(() => {
     if (searchQuery.trim()) {
       return searchParameters(searchQuery, scope);
@@ -86,6 +153,10 @@ export function MidiProvider({ children }: { children: ReactNode }) {
 
   const setValue = useCallback((id: number, value: number) => {
     midiParameterService.setParameter(id, value);
+    if (loadedSnapshotRef.current) {
+      workspaceStore.markDirty(loadedSnapshotRef.current.number, true);
+      setWorkspaceTick((t) => t + 1);
+    }
     setTick((t) => t + 1);
   }, []);
 
@@ -107,22 +178,160 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     );
   }, [conn.connected, searchQuery, scope]);
 
-  const requestLivePreset = useCallback(() => {
-    if (!conn.output) return;
-    setPresetStatus("Requesting live preset (0)…");
-    conn.output.send(buildRequestPreset(conn.sysexId, 0));
-  }, [conn.output, conn.sysexId]);
-
-  useEffect(() => {
+  const loadPresetFromDevice = useCallback(() => {
     if (!conn.connected) return;
-    return midiParameterService.onNotification((code) => {
-      setPresetStatus(NOTIFICATION_LABELS[code] ?? `Notification ${code}`);
-    });
-  }, [conn.connected]);
+    setHasLoadedSnapshot(false);
+    loadedSnapshotRef.current = null;
+    presetTransferService.requestPreset(presetSlot);
+  }, [conn.connected, presetSlot]);
+
+  const savePresetToDevice = useCallback(() => {
+    if (!conn.connected) return;
+    if (!canSaveToPresetSlot(presetSlot)) {
+      setPresetStatus(
+        "Cannot save to slot 0 (live step). Pick preset 1–275 or favorite 276–300."
+      );
+      return;
+    }
+    const live = midiParameterService.getValuesMap();
+    const svcSnap = presetTransferService.getSnapshot();
+    let base =
+      loadedSnapshotRef.current ??
+      (svcSnap ? cloneSnapshot(svcSnap) : null);
+    if (!base && live.size >= 20) {
+      base = buildSnapshotFromLiveValues(
+        presetSlot,
+        presetName,
+        live,
+        svcSnap ?? undefined
+      );
+    }
+    if (!base) {
+      setPresetStatus(
+        "Load a preset from the device first (wait until loading finishes), then Save."
+      );
+      return;
+    }
+    midiParameterService.enableEditorMode();
+    const merged = mergeLiveValuesIntoSnapshot(
+      {
+        ...base,
+        number: presetSlot,
+        name: normalizePresetName(presetName),
+      },
+      live
+    );
+    presetTransferService.savePreset(merged);
+    workspaceStore.upsert(merged, false);
+    loadedSnapshotRef.current = cloneSnapshot(merged);
+    setHasLoadedSnapshot(true);
+    setWorkspaceTick((t) => t + 1);
+  }, [conn.connected, presetSlot, presetName]);
 
   useEffect(() => {
     if (conn.connected && !searchQuery) refreshGroup();
   }, [conn.connected, activeGroup, scope]);
+
+  const refreshBackups = useCallback(async () => {
+    if (!window.presetLibrary) return;
+    await window.presetLibrary.ensureDirs();
+    const list = await window.presetLibrary.listBackups();
+    setBackups(list);
+  }, []);
+
+  useEffect(() => {
+    void refreshBackups();
+  }, [refreshBackups]);
+
+  const backupWorkspace = useCallback(async () => {
+    if (!window.presetLibrary) return;
+    const entries = workspaceStore.list();
+    if (entries.length === 0) {
+      setLibraryStatus("Workspace is empty — load presets first.");
+      return;
+    }
+    const files = entries.map((e) => ({
+      name: `preset-${e.slot}.vltpreset.json`,
+      content: snapshotToJson(e.snapshot),
+    }));
+    const dir = await window.presetLibrary.backupWorkspace(files);
+    setLibraryStatus(`Backed up to ${dir}`);
+    await refreshBackups();
+  }, [refreshBackups]);
+
+  const exportSelectedPreset = useCallback(async () => {
+    if (!window.presetLibrary) return;
+    const slot = selectedWorkspaceSlot ?? loadedSnapshotRef.current?.number;
+    const entry = slot != null ? workspaceStore.get(slot) : undefined;
+    const snap = entry?.snapshot ?? loadedSnapshotRef.current;
+    if (!snap) {
+      setLibraryStatus("Select a workspace preset or load from device.");
+      return;
+    }
+    const path = await window.presetLibrary.saveExportFile(
+      `preset-${snap.number}.vltpreset.json`,
+      snapshotToJson(snap),
+      false
+    );
+    if (path) setLibraryStatus(`Exported to ${path}`);
+  }, [selectedWorkspaceSlot]);
+
+  const importPresetFile = useCallback(async () => {
+    if (!window.presetLibrary) return;
+    const file = await window.presetLibrary.openImportFile();
+    if (!file) return;
+    try {
+      if (file.kind === "json") {
+        const snap = snapshotFromJson(file.text);
+        workspaceStore.upsert(snap, true);
+        loadedSnapshotRef.current = snap;
+        setHasLoadedSnapshot(true);
+        setPresetName(snap.name);
+        setPresetSlot(snap.number);
+        midiParameterService.applySnapshotValues(snapshotToLiveValues(snap));
+        setWorkspaceTick((t) => t + 1);
+        setTick((t) => t + 1);
+        setLibraryStatus(`Imported preset ${snap.number}`);
+      } else {
+        const raw = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
+        const snaps = importSyx(raw, conn.sysexId);
+        for (const s of snaps) workspaceStore.upsert(s, true);
+        if (snaps[0]) {
+          loadedSnapshotRef.current = snaps[0];
+          setHasLoadedSnapshot(true);
+          setPresetName(snaps[0].name);
+          setPresetSlot(snaps[0].number);
+          midiParameterService.applySnapshotValues(snapshotToLiveValues(snaps[0]));
+        }
+        setWorkspaceTick((t) => t + 1);
+        setTick((t) => t + 1);
+        setLibraryStatus(`Imported ${snaps.length} preset(s) from SysEx`);
+      }
+    } catch (err) {
+      setLibraryStatus(err instanceof Error ? err.message : "Import failed");
+    }
+  }, [conn.sysexId]);
+
+  const sendWorkspaceToDevice = useCallback(() => {
+    const slot = selectedWorkspaceSlot ?? loadedSnapshotRef.current?.number;
+    const entry = slot != null ? workspaceStore.get(slot) : undefined;
+    const snap = entry?.snapshot ?? loadedSnapshotRef.current;
+    if (!snap) {
+      setLibraryStatus("Nothing to send — import or load a preset.");
+      return;
+    }
+    const merged = mergeLiveValuesIntoSnapshot(
+      snap,
+      midiParameterService.getValuesMap()
+    );
+    presetTransferService.savePreset(merged);
+    setPresetStatus(`Sending preset ${merged.number}…`);
+  }, [selectedWorkspaceSlot]);
+
+  const workspace = useMemo(
+    () => workspaceStore.list(),
+    [workspaceTick, tick]
+  );
 
   const value = useMemo(
     () => ({
@@ -137,14 +346,32 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       setValue,
       refreshGroup,
       refreshSearch,
-      requestLivePreset,
+      presetSlot,
+      setPresetSlot,
+      presetName,
+      setPresetName,
+      loadPresetFromDevice,
+      savePresetToDevice,
       presetStatus,
+      hasLoadedSnapshot,
       showDebug,
       setShowDebug,
       lastIn,
       lastOut,
       visibleParameters,
       groups: parameterGroups,
+      workspace,
+      backups,
+      libraryStatus,
+      selectedWorkspaceSlot,
+      setSelectedWorkspaceSlot,
+      backupWorkspace,
+      exportSelectedPreset,
+      importPresetFile,
+      sendWorkspaceToDevice,
+      refreshBackups,
+      mainView,
+      setMainView,
     }),
     [
       conn,
@@ -155,12 +382,26 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       setValue,
       refreshGroup,
       refreshSearch,
-      requestLivePreset,
+      presetSlot,
+      presetName,
+      loadPresetFromDevice,
+      savePresetToDevice,
       presetStatus,
+      hasLoadedSnapshot,
       showDebug,
       lastIn,
       lastOut,
       visibleParameters,
+      workspace,
+      backups,
+      libraryStatus,
+      selectedWorkspaceSlot,
+      backupWorkspace,
+      exportSelectedPreset,
+      importPresetFile,
+      sendWorkspaceToDevice,
+      refreshBackups,
+      mainView,
     ]
   );
 

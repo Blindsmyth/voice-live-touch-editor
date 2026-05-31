@@ -1,0 +1,44 @@
+{
+  "107": [
+    { "value": 0, "label": "C" },
+    { "value": 1, "label": "C#" },
+    { "value": 2, "label": "D" },
+    { "value": 3, "label": "Eb" },
+    { "value": 4, "label": "E" },
+    { "value": 5, "label": "F" },
+    { "value": 6, "label": "F#" },
+    { "value": 7, "label": "G" },
+    { "value": 8, "label": "G#" },
+    { "value": 9, "label": "A" },
+    { "value": 10, "label": "Bb" },
+    { "value": 11, "label": "B" }
+  ],
+  "108": [
+    { "value": 0, "label": "Maj1" },
+    { "value": 1, "label": "Maj2" },
+    { "value": 2, "label": "Maj3" },
+    { "value": 3, "label": "Min1" },
+    { "value": 4, "label": "Min2" },
+    { "value": 5, "label": "Min3" },
+    { "value": 6, "label": "Custom" }
+  ],
+  "963": [
+    { "value": 0, "label": "C" },
+    { "value": 1, "label": "C#" },
+    { "value": 2, "label": "D" },
+    { "value": 3, "label": "Eb" },
+    { "value": 4, "label": "E" },
+    { "value": 5, "label": "F" },
+    { "value": 6, "label": "F#" },
+    { "value": 7, "label": "G" },
+    { "value": 8, "label": "G#" },
+    { "value": 9, "label": "A" },
+    { "value": 10, "label": "Bb" },
+    { "value": 11, "label": "B" }
+  ],
+  "61": [
+    { "value": 0, "label": "Off" },
+    { "value": 1, "label": "Soft" },
+    { "value": 2, "label": "Hard" }
+  ]
+}

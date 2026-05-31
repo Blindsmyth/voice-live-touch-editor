@@ -1,6 +1,11 @@
 export type ParameterScope = "preset" | "system";
 export type ParameterControl = "slider" | "toggle" | "select";
 
+export interface EnumOption {
+  value: number;
+  label: string;
+}
+
 export interface ParameterDef {
   id: number;
   offset: number;
@@ -13,6 +18,7 @@ export interface ParameterDef {
   max: number;
   centre: number;
   control: ParameterControl;
+  options?: EnumOption[];
 }
 
 /** @deprecated use presetParameters — Harm Vol (Mixer_L Level Harmony) */
@@ -36,6 +42,7 @@ export const MSG_PARAMETER_DATA = 0x22;
 export const MSG_REQUEST_PARAMETER = 0x47;
 export const MSG_EDITOR_MODE = 0x53;
 export const MSG_REQUEST_PRESET = 0x45;
+export const MSG_REQUEST_PRESET_HEADER = 0x46;
 export const MSG_PRESET_HEADER = 0x20;
 export const MSG_PRESET_DATA = 0x21;
 export const MSG_NOTIFICATION = 0x34;

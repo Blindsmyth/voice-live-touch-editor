@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
+import { registerPresetLibraryIpc } from "./preset-library-ipc.js";
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -23,6 +24,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  registerPresetLibraryIpc();
   createWindow();
 
   app.on("activate", () => {

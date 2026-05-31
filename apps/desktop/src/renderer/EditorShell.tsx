@@ -1,5 +1,7 @@
 import { ParameterPanel } from "@vlt/ui";
 import { useMidiContext } from "./context/MidiContext.js";
+import { PresetBar } from "./PresetBar.js";
+import { PresetLibraryPanel } from "./PresetLibraryPanel.js";
 
 export function EditorShell() {
   const {
@@ -14,14 +16,32 @@ export function EditorShell() {
     setValue,
     refreshGroup,
     refreshSearch,
-    requestLivePreset,
+    presetSlot,
+    setPresetSlot,
+    presetName,
+    setPresetName,
+    loadPresetFromDevice,
+    savePresetToDevice,
     presetStatus,
+    hasLoadedSnapshot,
     showDebug,
     setShowDebug,
     lastIn,
     lastOut,
     visibleParameters,
     groups,
+    workspace,
+    backups,
+    libraryStatus,
+    selectedWorkspaceSlot,
+    setSelectedWorkspaceSlot,
+    backupWorkspace,
+    exportSelectedPreset,
+    importPresetFile,
+    sendWorkspaceToDevice,
+    refreshBackups,
+    mainView,
+    setMainView,
   } = useMidiContext();
 
   const filteredGroups = groups.filter((g) =>
@@ -41,18 +61,24 @@ export function EditorShell() {
               {conn.connecting ? "Connecting…" : "Connect MIDI"}
             </button>
           ) : (
-            <>
-              <button className="secondary" onClick={conn.disconnect}>
-                Disconnect
-              </button>
-              <button className="secondary" onClick={refreshGroup}>
-                Refresh group
-              </button>
-              <button className="secondary" onClick={requestLivePreset}>
-                Request preset
-              </button>
-            </>
+            <button className="secondary" onClick={conn.disconnect}>
+              Disconnect
+            </button>
           )}
+          <button
+            type="button"
+            className={mainView === "editor" ? "secondary" : "secondary"}
+            onClick={() => setMainView("editor")}
+          >
+            Editor
+          </button>
+          <button
+            type="button"
+            className={mainView === "library" ? "" : "secondary"}
+            onClick={() => setMainView("library")}
+          >
+            Library
+          </button>
         </div>
       </header>
 
@@ -111,64 +137,104 @@ export function EditorShell() {
         </div>
       )}
 
-      {scope === "system" && conn.connected && (
+      {conn.connected && mainView === "editor" && (
+        <PresetBar
+          presetSlot={presetSlot}
+          onPresetSlotChange={setPresetSlot}
+          presetName={presetName}
+          onPresetNameChange={setPresetName}
+          onLoad={loadPresetFromDevice}
+          onSave={savePresetToDevice}
+          transferStatus={presetStatus}
+          hasLoadedSnapshot={hasLoadedSnapshot}
+          connected={conn.connected}
+        />
+      )}
+
+      {scope === "system" && conn.connected && mainView === "editor" && (
         <div className="banner warn">
           Global device settings — changes affect all presets.
         </div>
       )}
 
       <div className="editor-body">
-        <nav className="sidebar" aria-label="Parameter groups">
-          {!searchQuery &&
-            filteredGroups.map((g) => {
-              const count = scope === "preset" ? g.presetCount : g.systemCount;
-              return (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={activeGroup === g.id ? "nav-item active" : "nav-item"}
-                  onClick={() => setActiveGroup(g.id)}
-                >
-                  {g.label}
-                  <span className="badge">{count}</span>
-                </button>
-              );
-            })}
-          {searchQuery && (
-            <p className="subtitle" style={{ padding: "0.5rem" }}>
-              Search: {visibleParameters.length} matches
-            </p>
-          )}
-        </nav>
-
-        <main className="main-panel">
-          {!conn.connected ? (
-            <p className="vlt-empty">Connect MIDI to edit parameters.</p>
-          ) : (
-            <>
-              <div className="panel-header">
-                <h2>
-                  {searchQuery ? `Search: “${searchQuery}”` : activeGroup}
-                </h2>
-                <span className="subtitle">{conn.statusText}</span>
-              </div>
-              {conn.inputPortName && (
-                <p className="subtitle input-line">Input: {conn.inputPortName}</p>
+        {mainView === "editor" ? (
+          <>
+            <nav className="sidebar" aria-label="Parameter groups">
+              {!searchQuery &&
+                filteredGroups.map((g) => {
+                  const count = scope === "preset" ? g.presetCount : g.systemCount;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      className={activeGroup === g.id ? "nav-item active" : "nav-item"}
+                      onClick={() => setActiveGroup(g.id)}
+                    >
+                      {g.label}
+                      <span className="badge">{count}</span>
+                    </button>
+                  );
+                })}
+              {searchQuery && (
+                <p className="subtitle sidebar-note">
+                  Search: {visibleParameters.length} matches
+                </p>
               )}
-              <ParameterPanel
-                parameters={visibleParameters}
-                getValue={getValue}
-                setValue={setValue}
-              />
-            </>
-          )}
-        </main>
+            </nav>
+
+            <main className="main-panel">
+              {!conn.connected ? (
+                <p className="vlt-empty">Connect MIDI to edit parameters.</p>
+              ) : (
+                <>
+                  <div className="panel-header">
+                    <h2>{searchQuery ? `Search: “${searchQuery}”` : activeGroup}</h2>
+                    <button type="button" className="secondary" onClick={refreshGroup}>
+                      Refresh group
+                    </button>
+                  </div>
+                  {conn.inputPortName && (
+                    <p className="subtitle input-line">Input: {conn.inputPortName}</p>
+                  )}
+                  <ParameterPanel
+                    parameters={visibleParameters}
+                    getValue={getValue}
+                    setValue={setValue}
+                  />
+                </>
+              )}
+            </main>
+          </>
+        ) : (
+          <PresetLibraryPanel
+            workspace={workspace}
+            backups={backups}
+            libraryStatus={libraryStatus}
+            connected={conn.connected}
+            selectedWorkspaceSlot={selectedWorkspaceSlot}
+            onSelectSlot={(slot) => {
+              setSelectedWorkspaceSlot(slot);
+              const entry = workspace.find((e) => e.slot === slot);
+              if (entry) {
+                setPresetSlot(entry.slot);
+                setPresetName(entry.name);
+              }
+            }}
+            onBackupWorkspace={() => void backupWorkspace()}
+            onExportSelected={() => void exportSelectedPreset()}
+            onImport={() => void importPresetFile()}
+            onSendToDevice={sendWorkspaceToDevice}
+            onRefreshBackups={() => void refreshBackups()}
+          />
+        )}
       </div>
 
       <footer className="status-footer">
         <div>
           <strong>Status:</strong> {conn.statusText}
           {presetStatus && <> · {presetStatus}</>}
+          {libraryStatus && mainView === "library" && <> · {libraryStatus}</>}
         </div>
         {showDebug && lastOut && (
           <div>

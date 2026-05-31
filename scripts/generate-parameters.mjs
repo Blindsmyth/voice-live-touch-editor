@@ -8,6 +8,15 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
+
+let PARAMETER_ENUMS = {};
+try {
+  PARAMETER_ENUMS = JSON.parse(
+    readFileSync(join(root, "packages/core/src/parameter-enums.json"), "utf8")
+  );
+} catch {
+  console.warn("No parameter-enums.json — options omitted");
+}
 const sysexMd = readFileSync(
   join(root, "docs/VoiceLive-Touch-Sysex-Manual.md"),
   "utf8"
@@ -118,9 +127,22 @@ function parseTable(sectionTitle) {
   return rows;
 }
 
+function optionsFor(p) {
+  if (PARAMETER_ENUMS[String(p.id)]) return PARAMETER_ENUMS[String(p.id)];
+  if (p.control === "select" && p.min >= 0 && p.max - p.min <= 30) {
+    return Array.from({ length: p.max - p.min + 1 }, (_, i) => ({
+      value: p.min + i,
+      label: String(p.min + i),
+    }));
+  }
+  return undefined;
+}
+
 function emitParam(p) {
   const sub = p.subgroup ? `, subgroup: ${JSON.stringify(p.subgroup)}` : "";
-  return `  { id: ${p.id}, offset: ${p.offset}, name: ${JSON.stringify(p.name)}, label: ${JSON.stringify(p.label)}, scope: "${p.scope}", group: ${JSON.stringify(p.group)}, min: ${p.min}, max: ${p.max}, centre: ${p.centre}, control: "${p.control}"${sub} }`;
+  const opts = optionsFor(p);
+  const options = opts ? `, options: ${JSON.stringify(opts)}` : "";
+  return `  { id: ${p.id}, offset: ${p.offset}, name: ${JSON.stringify(p.name)}, label: ${JSON.stringify(p.label)}, scope: "${p.scope}", group: ${JSON.stringify(p.group)}, min: ${p.min}, max: ${p.max}, centre: ${p.centre}, control: "${p.control}"${sub}${options} }`;
 }
 
 const preset = parseTable("## Preset package parameter table");

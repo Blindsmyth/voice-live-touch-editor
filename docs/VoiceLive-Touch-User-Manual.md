@@ -37,7 +37,7 @@
 ## Before you begin
 
 - Download the latest manual and register the product via [TC-Helicon Support](https://www.tc-helicon.com/support).
-- Install [VoiceSupport](https://www.tc-helicon.com/voicesupport) for firmware updates and preset management (drag-and-drop presets, favorites 276–300 in VoiceSupport).
+- Install [VoiceSupport](https://www.tc-helicon.com/voicesupport) for firmware updates and preset management (drag-and-drop presets, favorites 276–300 in VoiceSupport). See also [VoiceSupport-Reference-Manual.md](./VoiceSupport-Reference-Manual.md) for how this editor’s **Library** tab maps to VoiceSupport workflows.
 
 ---
 
@@ -162,6 +162,18 @@
 - MIDI IN for preset change and harmony key.
 - Controller 44 for loop functions (see manual p.42).
 - Full SysEx protocol: [VoiceLive-Touch-Sysex-Manual.md](./VoiceLive-Touch-Sysex-Manual.md).
+
+### MIDI enum appendix (editor)
+
+Discrete parameters use labels from the VoiceLive Touch Complete Manual (ENG) MIDI table. Maintained in `packages/core/src/parameter-enums.json`.
+
+| SysEx ID | Name | Values |
+|----------|------|--------|
+| 107 | Harmony Key | 0=C, 1=C#, 2=D, 3=Eb, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=Bb, 11=B |
+| 108 | Harmony Scale | 0=Maj1, 1=Maj2, 2=Maj3, 3=Min1, 4=Min2, 5=Min3, 6=Custom |
+| 963 | Correct Key_Storage | Same as Harmony Key |
+
+Other small-range **Style** parameters use numeric labels unless added to `parameter-enums.json`.
 
 ---
 

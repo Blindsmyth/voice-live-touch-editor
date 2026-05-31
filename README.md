@@ -5,10 +5,12 @@ Open-source macOS editor for the TC-Helicon **Voice Live Touch** (v1), using MID
 ## Features
 
 - **334 SysEx parameters** — 225 preset (live step) + 108 system/setup
-- Grouped sidebar (Harmony, Mixer, Delay, Reverb, …)
+- Grouped sidebar pages (Harmony, Mixer, Delay, Reverb, …) — **all parameters visible** on each page (no nested collapsibles)
+- Human-readable enums (e.g. Harmony **Key** → C, C#, D…)
 - Search by name, label, or ID
 - Bidirectional edit: slider sends `0x22`, refresh requests `0x47`
-- Preset request (`0x45` preset 0) and notification parsing (`0x34`)
+- **Preset load/save** to device (`0x45` / `0x20` / `0x21`) with editable 15-character name
+- **Local library** — workspace, timestamped backups, import/export `.vltpreset.json` and `.syx`
 - Debug hex view for MIDI troubleshooting
 
 ## Requirements
@@ -24,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Connect MIDI → choose **Preset** or **System** scope → pick a group in the sidebar → edit parameters. Use **Refresh group** to read values from the device.
+Connect MIDI → choose **Preset** or **System** scope → pick a group in the sidebar → edit parameters. Use the **preset bar** to load/save slots (0 = live step, 1–275 user, 276–300 favorites). Open **Library** for backups and file import/export.
 
 ## Scripts
 
@@ -42,7 +44,7 @@ packages/core/       SysEx, MidiParameterService, generated parameter registry
 packages/ui/         ParameterControl, ParameterPanel
 apps/desktop/        Electron shell (EditorShell)
 scripts/             generate-parameters.mjs
-docs/                SysEx manual (MD+PDF), user manual (MD+PDF)
+docs/                SysEx, user, VoiceSupport reference manuals (MD)
 examples/            Reference Axoloti / Max editors
 ```
 
@@ -50,6 +52,7 @@ examples/            Reference Axoloti / Max editors
 
 - [VoiceLive-Touch-Sysex-Manual.md](docs/VoiceLive-Touch-Sysex-Manual.md) — protocol and parameter IDs
 - [VoiceLive-Touch-User-Manual.md](docs/VoiceLive-Touch-User-Manual.md) — device UI context (German source PDF)
+- [VoiceSupport-Reference-Manual.md](docs/VoiceSupport-Reference-Manual.md) — local library / backup UX (VoiceSupport-inspired)
 
 ## MIDI troubleshooting
 
@@ -58,9 +61,13 @@ examples/            Reference Axoloti / Max editors
 - **Wrong values** — verify SysEx ID matches device (`Utility SysEx_ID`, system param 858)
 - Enable **Debug hex** to compare with [examples/](examples/)
 
-## Preset transfer (basic)
+## Presets and library
 
-**Request preset** sends SysEx preset request for slot **0** (current edited step per manual). Full preset dump/load (`0x20`/`0x21` streams) is planned for a later release; notifications are already parsed.
+- **Load from device** — requests preset header + data (`0x45` → `0x20` + `0x21`), updates all preset parameters in the editor.
+- **Save to device** — sends header + data; **load first** so unsent slots are not zeroed.
+- **Library** — backup workspace to `~/Library/Application Support/voice-live-touch-editor/preset-library/backups/`, export/import JSON or SysEx.
+
+Enum labels (Key, Scale, styles) are defined in `packages/core/src/parameter-enums.json` and the [MIDI enum appendix](docs/VoiceLive-Touch-User-Manual.md#midi-enum-appendix-editor).
 
 ## License
 
