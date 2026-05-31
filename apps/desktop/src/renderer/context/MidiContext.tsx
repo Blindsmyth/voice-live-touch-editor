@@ -242,13 +242,19 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     if (presetTransferService.getPhase() === "receiving") {
       presetTransferService.cancelReceive();
     }
-    if (presetTransferService.getPhase() === "sending") {
-      setPresetStatus("Wait until the current save finishes.");
-      return;
+    const savePhase = presetTransferService.getPhase();
+    if (savePhase === "sending" || savePhase === "awaiting_ack") {
+      presetTransferService.cancelSave();
     }
     midiParameterService.enableEditorMode();
-    setPresetStatus(`Reading header for preset ${presetSlot}…`);
-    const header = await presetTransferService.requestHeaderAndWait(presetSlot);
+    let header: Awaited<
+      ReturnType<typeof presetTransferService.requestHeaderAndWait>
+    > = null;
+    const cached = loadedSnapshotRef.current;
+    if (!cached?.versionWire) {
+      setPresetStatus(`Reading header for preset ${presetSlot}…`);
+      header = await presetTransferService.requestHeaderAndWait(presetSlot);
+    }
     const live = midiParameterService.getValuesMap();
     const svcSnap = presetTransferService.getSnapshot();
     let base =

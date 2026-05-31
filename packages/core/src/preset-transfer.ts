@@ -315,7 +315,9 @@ export function parseNotification(
     return null;
   }
   const idByte = data[i + 3];
-  if (sysexId !== undefined && idByte !== sysexId) return null;
+  if (sysexId !== undefined && idByte !== sysexId) {
+    return parseNotification(data);
+  }
   if (data[i + 4] !== MODEL_ID && data[i + 4] !== 91) return null;
   if (data[i + 5] !== MSG_NOTIFICATION) return null;
   return data[i + 6] as NotificationCode;
@@ -367,11 +369,17 @@ export class PresetTransferService {
   private sendQueue: Uint8Array[] = [];
   private sendTimer: ReturnType<typeof setTimeout> | null = null;
   private ackTimeout: ReturnType<typeof setTimeout> | null = null;
+  private paceTimeout: ReturnType<typeof setTimeout> | null = null;
   private receiveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private awaitingPaceAck = false;
+  private expectingPresetData = false;
   private deviceVersionWire: [number, number] = [...DEFAULT_VERSION_WIRE];
   private headerWaiters: Array<{
     resolve: (header: ParsedPresetHeader | null) => void;
   }> = [];
+
+  private static readonly PACE_ACK_MS = 1200;
+  private static readonly SAVE_TOTAL_MS = 45000;
 
   setSysexId(id: number): void {
     this.sysexId = Math.max(0, Math.min(127, Math.round(id)));
@@ -409,6 +417,25 @@ export class PresetTransferService {
     }
   }
 
+  private clearSendTimers(): void {
+    if (this.sendTimer) clearTimeout(this.sendTimer);
+    this.sendTimer = null;
+    if (this.paceTimeout) clearTimeout(this.paceTimeout);
+    this.paceTimeout = null;
+    if (this.ackTimeout) clearTimeout(this.ackTimeout);
+    this.ackTimeout = null;
+    this.awaitingPaceAck = false;
+  }
+
+  /** Abort a stuck save (host→device transfer). */
+  cancelSave(): void {
+    if (this.phase !== "sending" && this.phase !== "awaiting_ack") return;
+    this.clearSendTimers();
+    this.sendQueue = [];
+    this.phase = "idle";
+    this.emit("Save cancelled.");
+  }
+
   /** Abort a stuck receive so Save / a new Load can proceed. */
   cancelReceive(): void {
     if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
@@ -422,6 +449,7 @@ export class PresetTransferService {
 
   requestPreset(presetNumber: number): void {
     if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+    this.expectingPresetData = true;
     this.phase = "receiving";
     this.headerReceived = false;
     this.snapshot = createEmptySnapshot(presetNumber);
@@ -490,8 +518,13 @@ export class PresetTransferService {
   handleSysex(data: Uint8Array): boolean {
     const header = parsePresetHeader(data, this.sysexId) ?? parsePresetHeader(data);
     if (header) {
+      if (this.phase === "sending" || this.phase === "awaiting_ack") {
+        return true;
+      }
       this.applyHeaderToSnapshot(header);
-      if (this.phase === "idle") this.phase = "receiving";
+      if (this.phase === "idle" && this.expectingPresetData) {
+        this.phase = "receiving";
+      }
       this.emit(`Received header: ${header.name || "(unnamed)"}`);
       return true;
     }
@@ -499,6 +532,9 @@ export class PresetTransferService {
     const chunk =
       parsePresetData(data, this.sysexId) ?? parsePresetData(data);
     if (chunk && this.snapshot) {
+      if (this.phase === "sending" || this.phase === "awaiting_ack") {
+        return true;
+      }
       const base = chunk.index * PRESET_PARAMS_PER_MESSAGE;
       chunk.values.forEach((v, j) => {
         const offset = base + j;
@@ -523,6 +559,7 @@ export class PresetTransferService {
     if (!this.snapshot || this.phase !== "receiving") return;
     if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
     this.receiveTimeout = null;
+    this.expectingPresetData = false;
     this.phase = "complete";
     this.emit(
       `Preset ${this.snapshot.number} loaded (${this.snapshot.name || "unnamed"})`
@@ -531,12 +568,12 @@ export class PresetTransferService {
 
   handleNotification(code: NotificationCode): void {
     if (code === 1) {
+      if (this.awaitingPaceAck && this.phase === "sending") {
+        this.onSavePaceAck();
+        return;
+      }
       if (this.phase === "awaiting_ack" && this.snapshot) {
-        if (this.ackTimeout) clearTimeout(this.ackTimeout);
-        this.phase = "complete";
-        this.emit(
-          `Preset ${this.snapshot.number} saved to device (${this.snapshot.name || "unnamed"})`
-        );
+        this.finishSave();
         return;
       }
       if (
@@ -546,7 +583,9 @@ export class PresetTransferService {
       ) {
         this.finishReceiving();
       }
-    } else if (this.phase === "sending" || this.phase === "awaiting_ack") {
+      return;
+    }
+    if (this.phase === "sending" || this.phase === "awaiting_ack") {
       if (this.sendTimer) clearTimeout(this.sendTimer);
       if (this.ackTimeout) clearTimeout(this.ackTimeout);
       this.sendQueue = [];
@@ -560,6 +599,8 @@ export class PresetTransferService {
       this.emit("Cannot save to slot 0 — choose a user preset (1–275) or favorite (276–300).");
       return;
     }
+    this.clearSendTimers();
+    this.expectingPresetData = false;
     const snap: PresetSnapshot = {
       ...snapshot,
       valuesByOffset: [...snapshot.valuesByOffset],
@@ -573,53 +614,92 @@ export class PresetTransferService {
     };
     this.snapshot = snap;
     this.phase = "sending";
-    if (this.ackTimeout) clearTimeout(this.ackTimeout);
+    const totalMessages = 1 + PRESET_DATA_MESSAGE_COUNT;
     this.sendQueue = [
       buildPresetHeader(this.sysexId, snap),
       ...Array.from({ length: PRESET_DATA_MESSAGE_COUNT }, (_, i) =>
         buildPresetData(this.sysexId, i, snap.valuesByOffset)
       ),
     ];
-    this.emit(`Saving preset ${snap.number}…`);
-    this.flushSendQueue();
+    this.emit(`Saving preset ${snap.number} (0/${totalMessages} sent)…`);
     this.ackTimeout = setTimeout(() => {
-      if (this.phase === "awaiting_ack") {
+      if (this.phase === "sending" || this.phase === "awaiting_ack") {
+        this.clearSendTimers();
+        this.sendQueue = [];
         this.phase = "idle";
         this.emit(
-          "No response from device after save — check MIDI input and SysEx ID."
+          "Save timed out — check MIDI input and SysEx ID. Try Load, then Save again."
         );
       }
-    }, 8000);
+    }, PresetTransferService.SAVE_TOTAL_MS);
+    this.sendNextSaveMessage(totalMessages);
   }
 
-  private flushSendQueue(): void {
-    if (!this.sendOutput || this.sendQueue.length === 0) {
-      if (this.sendQueue.length === 0 && this.phase === "sending") {
-        this.phase = "awaiting_ack";
-        this.emit("Waiting for device ack…");
-      }
+  private onSavePaceAck(): void {
+    if (this.paceTimeout) clearTimeout(this.paceTimeout);
+    this.paceTimeout = null;
+    this.awaitingPaceAck = false;
+    const totalMessages = 1 + PRESET_DATA_MESSAGE_COUNT;
+    if (this.sendQueue.length > 0) {
+      this.sendNextSaveMessage(totalMessages);
       return;
     }
+    this.finishSave();
+  }
+
+  private finishSave(): void {
+    if (!this.snapshot) return;
+    this.clearSendTimers();
+    this.sendQueue = [];
+    this.phase = "complete";
+    this.emit(
+      `Preset ${this.snapshot.number} saved to device (${this.snapshot.name || "unnamed"})`
+    );
+  }
+
+  /** Send one SysEx message, then wait for notification 1 before the next (per manual). */
+  private sendNextSaveMessage(totalMessages: number): void {
+    if (!this.sendOutput) {
+      this.clearSendTimers();
+      this.sendQueue = [];
+      this.phase = "idle";
+      this.emit("MIDI output not connected — cannot save.");
+      return;
+    }
+    if (this.sendQueue.length === 0) {
+      this.phase = "awaiting_ack";
+      this.emit("Waiting for final device confirmation…");
+      return;
+    }
+    const sent = totalMessages - this.sendQueue.length;
     const msg = this.sendQueue.shift()!;
     this.sendOutput(msg);
-    if (this.sendQueue.length > 0) {
-      this.phase = "sending";
-      this.sendTimer = setTimeout(() => this.flushSendQueue(), 60);
-    } else {
-      this.phase = "awaiting_ack";
-      this.emit("Waiting for device ack…");
-    }
+    this.awaitingPaceAck = true;
+    this.phase = "sending";
+    this.emit(
+      `Saving preset ${this.snapshot?.number ?? "?"} (${sent + 1}/${totalMessages} sent, waiting for ack)…`
+    );
+    if (this.paceTimeout) clearTimeout(this.paceTimeout);
+    this.paceTimeout = setTimeout(() => {
+      if (!this.awaitingPaceAck || this.phase !== "sending") return;
+      this.awaitingPaceAck = false;
+      if (this.sendQueue.length > 0) {
+        this.sendNextSaveMessage(totalMessages);
+      } else {
+        this.finishSave();
+      }
+    }, PresetTransferService.PACE_ACK_MS);
   }
 
   reset(): void {
-    if (this.sendTimer) clearTimeout(this.sendTimer);
-    if (this.ackTimeout) clearTimeout(this.ackTimeout);
+    this.clearSendTimers();
     if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
     this.receiveTimeout = null;
     this.phase = "idle";
     this.snapshot = null;
     this.receivedData.clear();
     this.headerReceived = false;
+    this.expectingPresetData = false;
     this.sendQueue = [];
     this.emit("Idle");
   }
