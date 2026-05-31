@@ -1,0 +1,14 @@
+{
+  "name": "voice-live-touch-editor",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @vlt/desktop",
+    "build": "npm run build -w @vlt/desktop",
+    "dist": "npm run dist -w @vlt/desktop"
+  }
+}

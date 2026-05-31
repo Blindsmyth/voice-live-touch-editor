@@ -1,0 +1,74 @@
+<patch-1.0 appVersion="1.0.12">
+   <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_1" x="56" y="42">
+      <params/>
+      <attribs>
+         <combo attributeName="output" selection="usb host port 2"/>
+      </attribs>
+      <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+         <sDescription></sDescription>
+         <author>Mattilyn Mattroe</author>
+         <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+         <helpPatch>LPadPro.axh</helpPatch>
+         <inlets>
+            <bool32 name="send"/>
+            <int32 name="v"/>
+         </inlets>
+         <outlets/>
+         <displays/>
+         <params/>
+         <attribs>
+            <combo name="output">
+               <MenuEntries>
+                  <string>usb host port 2</string>
+               </MenuEntries>
+               <CEntries>
+                  <string>MIDI_DEVICE_USB_HOST, 2</string>
+               </CEntries>
+            </combo>
+         </attribs>
+         <includes/>
+         <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;]]></code.declaration>
+         <code.krate><![CDATA[v = inlet_v;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[12] = {240,0,1,56,0,91,34,msb,msb2,msb3,lsb,247};
+
+if (inlet_send&&!strig){
+	MidiSendSysEx(MIDI_DEVICE_USB_HOST, 2, sysexArray ,12);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+      </object>
+   </patchobj>
+   <nets/>
+   <settings>
+      <subpatchmode>no</subpatchmode>
+   </settings>
+   <notes><![CDATA[]]></notes>
+   <windowPos>
+      <x>230</x>
+      <y>23</y>
+      <width>512</width>
+      <height>562</height>
+   </windowPos>
+</patch-1.0>

@@ -1,0 +1,147 @@
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
+  color: #e8e8ec;
+  background: #1a1a22;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+
+.subtitle {
+  color: #9898a8;
+  font-size: 0.85rem;
+  margin: 0 0 1.5rem;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+.field label {
+  display: block;
+  font-size: 0.8rem;
+  color: #b0b0bc;
+  margin-bottom: 0.35rem;
+}
+
+.field select,
+.field input[type="number"] {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #3a3a4a;
+  border-radius: 6px;
+  background: #252530;
+  color: #e8e8ec;
+  font-size: 0.9rem;
+}
+
+button {
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: #4a6cf7;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #5a7cff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #3a3a4a;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #4a4a5a;
+}
+
+.slider-row {
+  margin-top: 1.25rem;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.slider-header strong {
+  font-size: 1rem;
+}
+
+.slider-value {
+  font-variant-numeric: tabular-nums;
+  color: #7eb8ff;
+  font-size: 1.1rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: #4a6cf7;
+}
+
+.status {
+  margin-top: 1.25rem;
+  padding: 0.75rem;
+  background: #252530;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #9898a8;
+  word-break: break-all;
+}
+
+.status strong {
+  color: #c0c0cc;
+}
+
+.error {
+  color: #f08080;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.row button {
+  flex-shrink: 0;
+}

@@ -1,0 +1,2703 @@
+<patch-1.0 appVersion="1.0.12">
+   <obj type="table/alloc 8b sdram" uuid="7af0c2671e20d9c493553cf8b038ebbec89efb7" name="buttons" x="0" y="0">
+      <params/>
+      <attribs>
+         <combo attributeName="size" selection="4096"/>
+         <text attributeName="init">
+            <sText><![CDATA[]]></sText>
+         </text>
+      </attribs>
+   </obj>
+   <obj type="ctrl/toggle" uuid="42b8134fa729d54bfc8d62d6ef3fa99498c1de99" name="toggle_1" x="210" y="42">
+      <params>
+         <bool32.tgl name="b" value="1"/>
+      </params>
+      <attribs/>
+   </obj>
+   <patcher type="patch/patcher" uuid="e8ad1028-cdb7-4ccf-b41d-e0ad9e6f90d8" name="polyout_3" x="280" y="42">
+      <params/>
+      <attribs>
+         <combo attributeName="poly" selection="4"/>
+         <combo attributeName="midichannel" selection="5"/>
+         <combo attributeName="mididevice" selection="omni"/>
+         <combo attributeName="midiport" selection="omni"/>
+      </attribs>
+      <subpatch appVersion="1.0.12">
+         <obj type="const/i" uuid="e202f44b2df17ae0b3e663b98ea6b14c8ff00408" name="i_4" x="140" y="0">
+            <params/>
+            <attribs>
+               <spinner attributeName="value" value="4"/>
+            </attribs>
+         </obj>
+         <obj type="patch/inlet b" uuid="3b0d3eacb5bb978cb05d1372aa2714d5a4790844" name="Tetra/Vlt" x="28" y="14">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="const/i" uuid="e202f44b2df17ae0b3e663b98ea6b14c8ff00408" name="i_1" x="420" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="value" value="4"/>
+            </attribs>
+         </obj>
+         <obj type="const/i" uuid="e202f44b2df17ae0b3e663b98ea6b14c8ff00408" name="i_2" x="602" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="value" value="43"/>
+            </attribs>
+         </obj>
+         <obj type="table/read" uuid="65eb8d0f6a3344638de94c9882999b9af15510d0" name="read_2" x="686" y="42">
+            <params/>
+            <attribs>
+               <objref attributeName="table" obj="../buttons"/>
+            </attribs>
+         </obj>
+         <obj type="ctrl/i" uuid="a3786816db6ea5bc6ac4193a5cccdb2c83b83496" name="i_3" x="1120" y="56">
+            <params>
+               <int32 name="value" value="8"/>
+            </params>
+            <attribs/>
+         </obj>
+         <obj type="midi/in/keyb touch" uuid="edfcb4cfd5b2064e95f5a7ee644bca56252ec11f" name="keyb_1" x="0" y="84">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="d5bb7c81-16f4-4462-903d-eb0eedf1ad68" name="note_2" x="378" y="98">
+            <params/>
+            <attribs>
+               <combo attributeName="device" selection="din"/>
+            </attribs>
+            <object id="patch/object" uuid="d5bb7c81-16f4-4462-903d-eb0eedf1ad68">
+               <sDescription>Midi note output</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>midi_out.axh</helpPatch>
+               <inlets>
+                  <frac32.bipolar name="note" description="note (-64..63)"/>
+                  <frac32.positive name="velo" description="velocity"/>
+                  <bool32.rising name="trig" description="trigger"/>
+                  <int32 name="channel"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <combo name="device">
+                     <MenuEntries>
+                        <string>din</string>
+                        <string>usb host port 1</string>
+                        <string>usb host port 2</string>
+                        <string>usb host port 3</string>
+                        <string>usb host port 4</string>
+                        <string>internal port 1</string>
+                        <string>internal port 2</string>
+                        <string>usb device port 1</string>
+                     </MenuEntries>
+                     <CEntries>
+                        <string>MIDI_DEVICE_DIN, 1</string>
+                        <string>MIDI_DEVICE_USB_HOST, 1</string>
+                        <string>MIDI_DEVICE_USB_HOST, 2</string>
+                        <string>MIDI_DEVICE_USB_HOST, 3</string>
+                        <string>MIDI_DEVICE_USB_HOST, 4</string>
+                        <string>MIDI_DEVICE_INTERNAL, 1</string>
+                        <string>MIDI_DEVICE_INTERNAL, 2</string>
+                        <string>MIDI_DEVICE_USB_DEVICE, 1</string>
+                     </CEntries>
+                  </combo>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int ntrig;
+int lastnote;]]></code.declaration>
+               <code.init><![CDATA[ntrig=0;]]></code.init>
+               <code.krate><![CDATA[if ((inlet_trig>0) && !ntrig) {
+lastnote = (64+(inlet_note>>21))&0x7F;
+MidiSend3((midi_device_t) attr_device, MIDI_NOTE_ON + (inlet_channel),lastnote,inlet_velo>>20);  ntrig=1;
+}
+if (!(inlet_trig>0) && ntrig) {MidiSend3((midi_device_t) attr_device, MIDI_NOTE_OFF + (inlet_channel),lastnote,__USAT(inlet_velo>>20,7)); ntrig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="math/+" uuid="44553fdc8628c67ab535845ed1be304ad6c9553b" name="+_2" x="504" y="98">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="math/divremc" uuid="fd7d945542e16344358136d7e22cffd5be704260" name="divremc1" x="574" y="98">
+            <params/>
+            <attribs>
+               <spinner attributeName="denominator" value="12"/>
+            </attribs>
+         </obj>
+         <obj type="table/read" uuid="65eb8d0f6a3344638de94c9882999b9af15510d0" name="tabread1" x="686" y="112">
+            <params/>
+            <attribs>
+               <objref attributeName="table" obj="../tuning"/>
+            </attribs>
+         </obj>
+         <obj type="mux/mux 2" uuid="3bcb8a666381ed18b8962eda50b1aa679136f618" name="mux_1" x="812" y="112">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="math/div 64" uuid="da82c8ea54e956811f1d7264d921628e3301971e" name="div641" x="882" y="112">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="logic/change" uuid="42071f8cb4cfe1f35956c0bd5a313a57e049bec4" name="change_2" x="952" y="112">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="logic/or 2" uuid="3805d3c84d30032a44fbdbe42d9a2988a1790a3e" name="or_1" x="1036" y="112">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="logic/latch" uuid="14750683752bd43205826430adb7168dae3cc2c" name="latch_1" x="1106" y="112">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="math/*" uuid="b3eac405185d2a86512723be5db59930f78c4b4c" name="*_1" x="1176" y="112">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="78f1517c-2bf7-4d48-afcc-9af6b26348bc" name="bend_2" x="1316" y="112">
+            <params/>
+            <attribs>
+               <combo attributeName="device" selection="din"/>
+            </attribs>
+            <object id="patch/object" uuid="78f1517c-2bf7-4d48-afcc-9af6b26348bc">
+               <sDescription>Midi pitch bend output</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>midi_out.axh</helpPatch>
+               <inlets>
+                  <frac32.bipolar name="bend" description="pitch bend"/>
+                  <bool32.rising name="trig" description="trigger"/>
+                  <int32 name="channel"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <combo name="device">
+                     <MenuEntries>
+                        <string>din</string>
+                        <string>usb host port 1</string>
+                        <string>usb host port 2</string>
+                        <string>usb host port 3</string>
+                        <string>usb host port 4</string>
+                        <string>internal port 1</string>
+                        <string>internal port 2</string>
+                        <string>usb device port 1</string>
+                     </MenuEntries>
+                     <CEntries>
+                        <string>MIDI_DEVICE_DIN, 1</string>
+                        <string>MIDI_DEVICE_USB_HOST, 1</string>
+                        <string>MIDI_DEVICE_USB_HOST, 2</string>
+                        <string>MIDI_DEVICE_USB_HOST, 3</string>
+                        <string>MIDI_DEVICE_USB_HOST, 4</string>
+                        <string>MIDI_DEVICE_INTERNAL, 1</string>
+                        <string>MIDI_DEVICE_INTERNAL, 2</string>
+                        <string>MIDI_DEVICE_USB_DEVICE, 1</string>
+                     </CEntries>
+                  </combo>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int ntrig;
+]]></code.declaration>
+               <code.krate><![CDATA[if ((inlet_trig>0) && !ntrig) {MidiSend3((midi_device_t) attr_device , MIDI_PITCH_BEND + (inlet_channel),(inlet_bend>>14)&0x7F,(inlet_bend>>21)+64);  ntrig=1;}
+if (!(inlet_trig>0)) ntrig=0;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="patch/polyindex" uuid="edc730b5393c31d703572e0c0c88aaced643bd6" name="polyindex_1" x="140" y="126">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="math/+" uuid="b94a9b8e9adcb7d18868c0ee808a9b211b65578d" name="+_1" x="238" y="126">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="mux/mux 2" uuid="16f90f81694766b0bc8187bfcba5a021e5701d81" name="mux_2" x="308" y="126">
+            <params/>
+            <attribs/>
+         </obj>
+         <obj type="logic/change" uuid="42071f8cb4cfe1f35956c0bd5a313a57e049bec4" name="change_1" x="1232" y="126">
+            <params/>
+            <attribs/>
+         </obj>
+         <nets>
+            <net>
+               <source obj="keyb_1" outlet="note"/>
+               <dest obj="note_2" inlet="note"/>
+               <dest obj="+_2" inlet="in2"/>
+            </net>
+            <net>
+               <source obj="keyb_1" outlet="gate2"/>
+               <dest obj="note_2" inlet="trig"/>
+               <dest obj="or_1" inlet="i2"/>
+            </net>
+            <net>
+               <source obj="polyindex_1" outlet="index"/>
+               <dest obj="+_1" inlet="in2"/>
+               <dest obj="mux_2" inlet="i1"/>
+            </net>
+            <net>
+               <source obj="tabread1" outlet="o"/>
+               <dest obj="mux_1" inlet="i2"/>
+            </net>
+            <net>
+               <source obj="divremc1" outlet="rem"/>
+               <dest obj="tabread1" inlet="a"/>
+            </net>
+            <net>
+               <source obj="div641" outlet="out"/>
+               <dest obj="latch_1" inlet="i"/>
+               <dest obj="change_2" inlet="in"/>
+            </net>
+            <net>
+               <source obj="latch_1" outlet="o"/>
+               <dest obj="change_1" inlet="in"/>
+               <dest obj="*_1" inlet="b"/>
+            </net>
+            <net>
+               <source obj="change_1" outlet="trig"/>
+               <dest obj="bend_2" inlet="trig"/>
+            </net>
+            <net>
+               <source obj="i_3" outlet="out"/>
+               <dest obj="*_1" inlet="a"/>
+            </net>
+            <net>
+               <source obj="*_1" outlet="result"/>
+               <dest obj="bend_2" inlet="bend"/>
+            </net>
+            <net>
+               <source obj="change_2" outlet="trig"/>
+               <dest obj="or_1" inlet="i1"/>
+            </net>
+            <net>
+               <source obj="or_1" outlet="o"/>
+               <dest obj="latch_1" inlet="trig"/>
+            </net>
+            <net>
+               <source obj="mux_1" outlet="o"/>
+               <dest obj="div641" inlet="in"/>
+            </net>
+            <net>
+               <source obj="i_2" outlet="out"/>
+               <dest obj="read_2" inlet="a"/>
+            </net>
+            <net>
+               <source obj="read_2" outlet="o"/>
+               <dest obj="mux_1" inlet="s"/>
+            </net>
+            <net>
+               <source obj="mux_2" outlet="o"/>
+               <dest obj="note_2" inlet="channel"/>
+               <dest obj="bend_2" inlet="channel"/>
+            </net>
+            <net>
+               <source obj="i_4" outlet="out"/>
+               <dest obj="+_1" inlet="in1"/>
+            </net>
+            <net>
+               <source obj="+_1" outlet="out"/>
+               <dest obj="mux_2" inlet="i2"/>
+            </net>
+            <net>
+               <source obj="Tetra/Vlt" outlet="inlet"/>
+               <dest obj="mux_2" inlet="s"/>
+            </net>
+            <net>
+               <source obj="keyb_1" outlet="velocity"/>
+               <dest obj="note_2" inlet="velo"/>
+            </net>
+            <net>
+               <source obj="i_1" outlet="out"/>
+               <dest obj="+_2" inlet="in1"/>
+            </net>
+            <net>
+               <source obj="+_2" outlet="out"/>
+               <dest obj="divremc1" inlet="a"/>
+            </net>
+         </nets>
+         <settings>
+            <subpatchmode>polyphonic</subpatchmode>
+            <MidiChannel>1</MidiChannel>
+            <HasMidiChannelSelector>true</HasMidiChannelSelector>
+            <NPresets>0</NPresets>
+            <NPresetEntries>0</NPresetEntries>
+            <NModulationSources>0</NModulationSources>
+            <NModulationTargetsPerSource>0</NModulationTargetsPerSource>
+         </settings>
+         <notes><![CDATA[]]></notes>
+         <windowPos>
+            <x>21</x>
+            <y>47</y>
+            <width>1419</width>
+            <height>424</height>
+         </windowPos>
+      </subpatch>
+   </patcher>
+   <obj type="table/alloc 8b sdram" uuid="7af0c2671e20d9c493553cf8b038ebbec89efb7" name="encoder" x="0" y="56">
+      <params/>
+      <attribs>
+         <combo attributeName="size" selection="512"/>
+         <text attributeName="init">
+            <sText><![CDATA[]]></sText>
+         </text>
+      </attribs>
+   </obj>
+   <obj type="table/alloc 32b sdram" uuid="1a4546b7b52747ea765093ac97444601c44721e8" name="tuning" x="0" y="126">
+      <params/>
+      <attribs>
+         <combo attributeName="size" selection="32"/>
+         <text attributeName="init">
+            <sText><![CDATA[]]></sText>
+         </text>
+      </attribs>
+   </obj>
+   <patcher type="patch/patcher" uuid="d202e110-e3e6-4242-abf9-a2dfc004c9f0" name="VLT Control" x="504" y="140">
+      <params>
+         <int32 name="Harm Volume" value="0"/>
+         <int32 name="HarmonyAttack" value="0"/>
+         <int32 name="HarmonyRelease" value="340"/>
+         <int32 name="Harmony HoldRelase" value="5"/>
+         <bool32.tgl name="harmony notes ext" value="0"/>
+         <int32 name="V1 Portamento" value="0"/>
+         <int32 name="V2 Portamento" value="0"/>
+         <int32 name="V3 Portamento" value="0"/>
+         <int32 name="V4 Portamento" value="0"/>
+         <int32 name="double volume" value="0"/>
+         <int32 name="v1smoothing" value="0"/>
+         <int32 name="V2 Smoothing" value="0"/>
+         <int32 name="V3 smoothing" value="0"/>
+         <int32 name="V4 smoothing" value="0"/>
+         <int32 name="v1Pan" value="0"/>
+         <int32 name="v2pan" value="0"/>
+         <int32 name="v3pan" value="0"/>
+         <int32 name="v4pan" value="0"/>
+         <int32 name="HarmNotesPas" value="2"/>
+         <int32 name="HarmNotesSmooth" value="0"/>
+         <int32 name="HarmNotesGender" value="0"/>
+         <int32 name="HarmNotesPortamento" value="0"/>
+         <int32 name="doublinghumanamount" value="0"/>
+         <int32 name="panlead" value="0"/>
+      </params>
+      <attribs/>
+      <subpatch appVersion="1.0.12">
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="Harm Volume" x="28" y="42">
+            <params>
+               <int32 name="value" onParent="true" value="-19"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-61"/>
+                     <MaxValue i="0"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_28" x="98" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="193"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="HarmonyAttack" x="336" y="42">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="1000"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_12" x="406" y="42">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_13" x="490" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="6"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <sDescription>6</sDescription>
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="HarmonyRelease" x="602" y="42">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="2000"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_13" x="686" y="42">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_14" x="770" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="8"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="Harmony HoldRelase" x="882" y="42">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="100"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_14" x="980" y="42">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_15" x="1064" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="11"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="ctrl/toggle" uuid="42b8134fa729d54bfc8d62d6ef3fa99498c1de99" name="harmony notes ext" x="1190" y="42">
+            <params>
+               <bool32.tgl name="b" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+         </obj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_15" x="1260" y="42">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_16" x="1344" y="42">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="14"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <comment type="patch/comment" x="28" y="168" text="V1"/>
+         <comment type="patch/comment" x="294" y="168" text="V2"/>
+         <comment type="patch/comment" x="560" y="168" text="V3"/>
+         <comment type="patch/comment" x="826" y="168" text="V4"/>
+         <comment type="patch/comment" x="28" y="182" text="Portamento"/>
+         <comment type="patch/comment" x="294" y="182" text="Portamento"/>
+         <comment type="patch/comment" x="560" y="182" text="Portamento"/>
+         <comment type="patch/comment" x="826" y="182" text="Portamento"/>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V1 Portamento" x="28" y="196">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_4" x="98" y="196">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_5" x="182" y="196">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="0"/>
+               <spinner attributeName="paramlsb" value="47"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V2 Portamento" x="294" y="196">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_5" x="364" y="196">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_6" x="448" y="196">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="0"/>
+               <spinner attributeName="paramlsb" value="48"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V3 Portamento" x="560" y="196">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_6" x="630" y="196">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_7" x="714" y="196">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="0"/>
+               <spinner attributeName="paramlsb" value="49"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V4 Portamento" x="826" y="196">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_7" x="896" y="196">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_8" x="980" y="196">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="0"/>
+               <spinner attributeName="paramlsb" value="50"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="double volume" x="1148" y="294">
+            <params>
+               <int32 name="value" onParent="true" value="-19"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-61"/>
+                     <MaxValue i="0"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_29" x="1218" y="294">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="195"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <comment type="patch/comment" x="14" y="308" text="V1"/>
+         <comment type="patch/comment" x="294" y="308" text="V2"/>
+         <comment type="patch/comment" x="560" y="308" text="V3"/>
+         <comment type="patch/comment" x="826" y="308" text="V4"/>
+         <comment type="patch/comment" x="14" y="322" text="Portamento"/>
+         <comment type="patch/comment" x="294" y="322" text="Portamento"/>
+         <comment type="patch/comment" x="560" y="322" text="Portamento"/>
+         <comment type="patch/comment" x="826" y="322" text="Portamento"/>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="v1smoothing" x="14" y="336">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_8" x="98" y="336">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_9" x="182" y="336">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="0"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V2 Smoothing" x="294" y="336">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_9" x="364" y="336">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_10" x="434" y="336">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="1"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V3 smoothing" x="560" y="336">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_10" x="630" y="336">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_11" x="714" y="336">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="2"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="V4 smoothing" x="826" y="336">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_11" x="896" y="336">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_12" x="980" y="336">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="3"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <sDescription>3</sDescription>
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="v1Pan" x="14" y="462">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-50"/>
+                     <MaxValue i="50"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_23" x="84" y="462">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="216"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="v2pan" x="182" y="462">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-50"/>
+                     <MaxValue i="50"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_24" x="252" y="462">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="217"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="v3pan" x="350" y="462">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-50"/>
+                     <MaxValue i="50"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_25" x="420" y="462">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="218"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="v4pan" x="518" y="462">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-50"/>
+                     <MaxValue i="50"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_26" x="588" y="462">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="219"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <comment type="patch/comment" x="42" y="574" text="V1"/>
+         <comment type="patch/comment" x="322" y="574" text="V2"/>
+         <comment type="patch/comment" x="588" y="574" text="V3"/>
+         <comment type="patch/comment" x="854" y="574" text="V4"/>
+         <comment type="patch/comment" x="42" y="588" text="Portamento"/>
+         <comment type="patch/comment" x="322" y="588" text="Portamento"/>
+         <comment type="patch/comment" x="588" y="588" text="Portamento"/>
+         <comment type="patch/comment" x="854" y="588" text="Portamento"/>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="HarmNotesPas" x="42" y="602">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="2"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_16" x="126" y="602">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_17" x="210" y="602">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="29"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="HarmNotesSmooth" x="322" y="602">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="100"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_17" x="392" y="602">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_18" x="476" y="602">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="30"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="HarmNotesGender" x="588" y="602">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-50"/>
+                     <MaxValue i="50"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_18" x="658" y="602">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_19" x="742" y="602">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="31"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="HarmNotesPortamento" x="854" y="602">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="200"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <obj type="logic/change" uuid="96e39ae624c3f3c952cec4a95e1986ee0104f718" name="change_19" x="924" y="602">
+            <params/>
+            <attribs/>
+         </obj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_20" x="1008" y="602">
+            <params/>
+            <attribs>
+               <spinner attributeName="parammsb" value="1"/>
+               <spinner attributeName="paramlsb" value="32"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <sDescription>3</sDescription>
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <bool32 name="send"/>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="parammsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+                  <spinner name="paramlsb" MinValue="0" MaxValue="127" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parammsb;
+int paramlsb;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+paramlsb = attr_paramlsb;
+parammsb = attr_parammsb;
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parammsb,paramlsb,msb3,msb2,msb,lsb,247}; 
+
+if (inlet_send&&!strig){
+	sdWrite(&SDMIDI, sysexArray, 14);
+	strig=1;
+}
+
+else if (!inlet_send){strig=0;}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="doublinghumanamount" x="42" y="742">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="0"/>
+                     <MaxValue i="100"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_22" x="154" y="742">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="163"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd" name="panlead" x="308" y="742">
+            <params>
+               <int32 name="value" onParent="true" value="0"/>
+            </params>
+            <attribs/>
+            <object id="patch/object" uuid="c43309da-2297-462f-9a81-e11054cb62dd">
+               <sDescription>positive integer control</sDescription>
+               <author>Johannes Taelman</author>
+               <license>BSD</license>
+               <helpPatch>ctrl.axh</helpPatch>
+               <inlets/>
+               <outlets>
+                  <int32.positive name="out" description="output"/>
+               </outlets>
+               <displays/>
+               <params>
+                  <int32 name="value" noLabel="true">
+                     <MinValue i="-50"/>
+                     <MaxValue i="50"/>
+                  </int32>
+               </params>
+               <attribs/>
+               <includes/>
+               <code.krate><![CDATA[outlet_out= param_value;]]></code.krate>
+            </object>
+         </patchobj>
+         <patchobj type="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668" name="layout_27" x="378" y="742">
+            <params/>
+            <attribs>
+               <spinner attributeName="paramID" value="215"/>
+            </attribs>
+            <object id="patch/object" uuid="8c46ef5d-87fa-459c-a88f-6abd842c6668">
+               <author>Mattilyn Mattroe</author>
+               <license>give me two apple pies and a small fries evry time the object is used in an art installation at the louvre. Otherwise, do as you will</license>
+               <helpPatch>LPadPro.axh</helpPatch>
+               <inlets>
+                  <int32 name="v"/>
+               </inlets>
+               <outlets/>
+               <displays/>
+               <params/>
+               <attribs>
+                  <spinner name="paramID" MinValue="0" MaxValue="20000" DefaultValue="0"/>
+               </attribs>
+               <includes/>
+               <code.declaration><![CDATA[int strig;
+int v;
+int msb;
+int msb2;
+int msb3;
+int lsb;
+int parlsb;
+int parmsb;
+
+int prev;]]></code.declaration>
+               <code.krate><![CDATA[v = inlet_v;
+parmsb = (attr_paramID)/128;
+parlsb = attr_paramID - (parmsb * 128);
+
+
+if (v < 0){
+	msb = 127;
+	msb2 = 127;
+	msb3 = 31;
+	lsb = 128 + v;
+} else  if (v >= 0){
+
+	msb = (v / 128);
+	msb2 = (v / 16384);				
+	msb3 = (v / 2097152);
+	
+	lsb = v - ((msb * 128) + (msb2 * 16384) + (msb3 * 2097152));
+	
+	}
+
+uint8_t sysexArray[14] = {240,0,1,56,0,91,34,parmsb,parlsb,msb3,msb2,msb,lsb,247}; 
+
+
+if (inlet_v != prev) {	
+sdWrite(&SDMIDI, sysexArray, 14);
+prev = inlet_v; 
+}]]></code.krate>
+            </object>
+         </patchobj>
+         <nets>
+            <net>
+               <source obj="V1 Portamento" outlet="out"/>
+               <dest obj="change_4" inlet="in"/>
+               <dest obj="layout_5" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_4" outlet="trig"/>
+               <dest obj="layout_5" inlet="send"/>
+            </net>
+            <net>
+               <source obj="V2 Portamento" outlet="out"/>
+               <dest obj="change_5" inlet="in"/>
+               <dest obj="layout_6" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_5" outlet="trig"/>
+               <dest obj="layout_6" inlet="send"/>
+            </net>
+            <net>
+               <source obj="V3 Portamento" outlet="out"/>
+               <dest obj="change_6" inlet="in"/>
+               <dest obj="layout_7" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_6" outlet="trig"/>
+               <dest obj="layout_7" inlet="send"/>
+            </net>
+            <net>
+               <source obj="V4 Portamento" outlet="out"/>
+               <dest obj="change_7" inlet="in"/>
+               <dest obj="layout_8" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_7" outlet="trig"/>
+               <dest obj="layout_8" inlet="send"/>
+            </net>
+            <net>
+               <source obj="v1smoothing" outlet="out"/>
+               <dest obj="change_8" inlet="in"/>
+               <dest obj="layout_9" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_8" outlet="trig"/>
+               <dest obj="layout_9" inlet="send"/>
+            </net>
+            <net>
+               <source obj="V2 Smoothing" outlet="out"/>
+               <dest obj="change_9" inlet="in"/>
+               <dest obj="layout_10" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_9" outlet="trig"/>
+               <dest obj="layout_10" inlet="send"/>
+            </net>
+            <net>
+               <source obj="V3 smoothing" outlet="out"/>
+               <dest obj="change_10" inlet="in"/>
+               <dest obj="layout_11" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_10" outlet="trig"/>
+               <dest obj="layout_11" inlet="send"/>
+            </net>
+            <net>
+               <source obj="V4 smoothing" outlet="out"/>
+               <dest obj="change_11" inlet="in"/>
+               <dest obj="layout_12" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_11" outlet="trig"/>
+               <dest obj="layout_12" inlet="send"/>
+            </net>
+            <net>
+               <source obj="HarmonyAttack" outlet="out"/>
+               <dest obj="change_12" inlet="in"/>
+               <dest obj="layout_13" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_12" outlet="trig"/>
+               <dest obj="layout_13" inlet="send"/>
+            </net>
+            <net>
+               <source obj="HarmonyRelease" outlet="out"/>
+               <dest obj="change_13" inlet="in"/>
+               <dest obj="layout_14" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_13" outlet="trig"/>
+               <dest obj="layout_14" inlet="send"/>
+            </net>
+            <net>
+               <source obj="Harmony HoldRelase" outlet="out"/>
+               <dest obj="change_14" inlet="in"/>
+               <dest obj="layout_15" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_14" outlet="trig"/>
+               <dest obj="layout_15" inlet="send"/>
+            </net>
+            <net>
+               <source obj="change_15" outlet="trig"/>
+               <dest obj="layout_16" inlet="send"/>
+            </net>
+            <net>
+               <source obj="harmony notes ext" outlet="o"/>
+               <dest obj="change_15" inlet="in"/>
+               <dest obj="layout_16" inlet="v"/>
+            </net>
+            <net>
+               <source obj="HarmNotesPas" outlet="out"/>
+               <dest obj="change_16" inlet="in"/>
+               <dest obj="layout_17" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_16" outlet="trig"/>
+               <dest obj="layout_17" inlet="send"/>
+            </net>
+            <net>
+               <source obj="HarmNotesSmooth" outlet="out"/>
+               <dest obj="change_17" inlet="in"/>
+               <dest obj="layout_18" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_17" outlet="trig"/>
+               <dest obj="layout_18" inlet="send"/>
+            </net>
+            <net>
+               <source obj="HarmNotesGender" outlet="out"/>
+               <dest obj="change_18" inlet="in"/>
+               <dest obj="layout_19" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_18" outlet="trig"/>
+               <dest obj="layout_19" inlet="send"/>
+            </net>
+            <net>
+               <source obj="HarmNotesPortamento" outlet="out"/>
+               <dest obj="change_19" inlet="in"/>
+               <dest obj="layout_20" inlet="v"/>
+            </net>
+            <net>
+               <source obj="change_19" outlet="trig"/>
+               <dest obj="layout_20" inlet="send"/>
+            </net>
+            <net>
+               <source obj="doublinghumanamount" outlet="out"/>
+               <dest obj="layout_22" inlet="v"/>
+            </net>
+            <net>
+               <source obj="v1Pan" outlet="out"/>
+               <dest obj="layout_23" inlet="v"/>
+            </net>
+            <net>
+               <source obj="v2pan" outlet="out"/>
+               <dest obj="layout_24" inlet="v"/>
+            </net>
+            <net>
+               <source obj="v3pan" outlet="out"/>
+               <dest obj="layout_25" inlet="v"/>
+            </net>
+            <net>
+               <source obj="v4pan" outlet="out"/>
+               <dest obj="layout_26" inlet="v"/>
+            </net>
+            <net>
+               <source obj="panlead" outlet="out"/>
+               <dest obj="layout_27" inlet="v"/>
+            </net>
+            <net>
+               <source obj="Harm Volume" outlet="out"/>
+               <dest obj="layout_28" inlet="v"/>
+            </net>
+            <net>
+               <source obj="double volume" outlet="out"/>
+               <dest obj="layout_29" inlet="v"/>
+            </net>
+         </nets>
+         <settings>
+            <subpatchmode>no</subpatchmode>
+         </settings>
+         <notes><![CDATA[]]></notes>
+         <windowPos>
+            <x>0</x>
+            <y>23</y>
+            <width>1440</width>
+            <height>771</height>
+         </windowPos>
+      </subpatch>
+   </patcher>
+   <obj type="midi/in/monitor" uuid="b51863ca-6afa-4d29-acfd-c8c2fe06cb16" name="monitor_1" x="140" y="294">
+      <params>
+         <bool32.tgl name="ControlChange" value="0"/>
+         <bool32.tgl name="Note" value="1"/>
+         <bool32.tgl name="ProgramChange" value="0"/>
+         <bool32.tgl name="Bend" value="0"/>
+         <bool32.tgl name="PolyPressure" value="0"/>
+      </params>
+      <attribs/>
+   </obj>
+   <nets>
+      <net>
+         <source obj="toggle_1" outlet="o"/>
+         <dest obj="polyout_3" inlet="Tetra/Vlt"/>
+      </net>
+   </nets>
+   <settings>
+      <subpatchmode>no</subpatchmode>
+   </settings>
+   <notes><![CDATA[]]></notes>
+   <windowPos>
+      <x>0</x>
+      <y>23</y>
+      <width>1022</width>
+      <height>744</height>
+   </windowPos>
+</patch-1.0>
