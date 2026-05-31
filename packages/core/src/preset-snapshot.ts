@@ -1,20 +1,9 @@
+import { pack14 } from "./sysex.js";
 import { presetParameters } from "./generated/preset-parameters.js";
 
-/**
- * Parameter set version 0.26 from the SysEx manual (hex-style id).
- * On the wire this is 14-bit packed value 38 (0x26), not decimal 26.
- */
-export const PRESET_PARAMETER_VERSION = 0x26;
-
-/** Resolve version for save: prefer loaded header, then device default. */
-export function resolvePresetVersion(
-  snapshotVersion: number,
-  deviceVersion: number | null
-): number {
-  if (snapshotVersion > 0) return snapshotVersion;
-  if (deviceVersion != null && deviceVersion > 0) return deviceVersion;
-  return PRESET_PARAMETER_VERSION;
-}
+/** Parameter set version 0.26 — wire bytes [0, 26] per TC-Helicon Touch SysEx manual. */
+export const PRESET_PARAMETER_VERSION = 26;
+export const DEFAULT_VERSION_WIRE: [number, number] = [0, 26];
 
 export const PRESET_VALUE_COUNT = 226;
 export const PRESET_PARAMS_PER_MESSAGE = 25;
@@ -24,7 +13,12 @@ export const PRESET_DATA_MESSAGE_COUNT = Math.ceil(
 
 export interface PresetSnapshot {
   number: number;
+  /** Parsed 14-bit version (informational). */
   version: number;
+  /** Exact 2 version bytes from device header — must be echoed on save. */
+  versionWire: [number, number];
+  /** Exact 2 preset-number bytes from device header when available. */
+  numberWire?: [number, number];
   name: string;
   tags: number;
   stepCount: number;
@@ -39,15 +33,36 @@ for (const p of presetParameters) {
   idToOffset.set(p.id, p.offset);
 }
 
+/** Parse 14-bit field; `wire` is always the raw bytes from the message (for echo on save). */
+export function parse14BitPair(
+  byte0: number,
+  byte1: number
+): { value: number; wire: [number, number] } {
+  const w0 = byte0 & 0x7f;
+  const w1 = byte1 & 0x7f;
+  const wire: [number, number] = [w0, w1];
+  if (w0 === 0) return { value: w1, wire };
+  if (w1 === 0) return { value: w0, wire };
+  const vMsbFirst = w0 * 128 + w1;
+  const vLsbFirst = w1 * 128 + w0;
+  if (vMsbFirst <= 4095 && vMsbFirst <= vLsbFirst) {
+    return { value: vMsbFirst, wire };
+  }
+  if (vLsbFirst <= 4095) return { value: vLsbFirst, wire };
+  return { value: vMsbFirst, wire };
+}
+
 export function createEmptySnapshot(presetNumber: number): PresetSnapshot {
-  const valuesByOffset = presetParameters.map((p) => p.centre);
+  const numberWire = pack14(presetNumber);
   return {
     number: presetNumber,
     version: PRESET_PARAMETER_VERSION,
+    versionWire: [...DEFAULT_VERSION_WIRE],
+    numberWire: [numberWire[0], numberWire[1]],
     name: "",
     tags: 0,
     stepCount: 1,
-    valuesByOffset,
+    valuesByOffset: presetParameters.map((p) => p.centre),
   };
 }
 
@@ -83,20 +98,19 @@ export function decodePresetName(bytes: number[]): string {
   return String.fromCharCode(...chars);
 }
 
-/** Merge live editor values into snapshot; only updates known offsets. */
 export function cloneSnapshot(snapshot: PresetSnapshot): PresetSnapshot {
   return {
     ...snapshot,
+    versionWire: [...snapshot.versionWire],
+    numberWire: snapshot.numberWire ? [...snapshot.numberWire] : undefined,
     valuesByOffset: [...snapshot.valuesByOffset],
   };
 }
 
-/** True if this slot can be written via SysEx (not live step 0). */
 export function canSaveToPresetSlot(slot: number): boolean {
   return slot >= 1 && slot <= 300;
 }
 
-/** Build a snapshot from current editor values (fallback when bulk dump incomplete). */
 export function buildSnapshotFromLiveValues(
   presetNumber: number,
   name: string,
@@ -105,9 +119,13 @@ export function buildSnapshotFromLiveValues(
 ): PresetSnapshot {
   const snap = createEmptySnapshot(presetNumber);
   snap.name = normalizePresetName(name);
-  if (partial?.version != null && partial.version > 0) {
+  if (partial?.versionWire) snap.versionWire = [...partial.versionWire];
+  else if (partial?.version != null && partial.version > 0) {
+    const w = pack14(partial.version);
+    snap.versionWire = [w[0], w[1]];
     snap.version = partial.version;
   }
+  if (partial?.numberWire) snap.numberWire = [...partial.numberWire];
   if (partial?.tags != null) snap.tags = partial.tags;
   if (partial?.stepCount != null) snap.stepCount = partial.stepCount;
   return mergeLiveValuesIntoSnapshot(snap, liveValues);
@@ -150,7 +168,7 @@ export function snapshotToJson(snapshot: PresetSnapshot): string {
     version: 1,
     snapshot,
   };
-  return JSON.stringify(file, null, 2);
+  return JSON.stringify(file, null, 1);
 }
 
 export function snapshotFromJson(text: string): PresetSnapshot {
@@ -161,6 +179,10 @@ export function snapshotFromJson(text: string): PresetSnapshot {
   const s = parsed.snapshot;
   if (s.valuesByOffset.length !== PRESET_VALUE_COUNT) {
     throw new Error(`Expected ${PRESET_VALUE_COUNT} preset values`);
+  }
+  if (!s.versionWire) {
+    const w = pack14(s.version ?? PRESET_PARAMETER_VERSION);
+    s.versionWire = [w[0], w[1]];
   }
   return s;
 }

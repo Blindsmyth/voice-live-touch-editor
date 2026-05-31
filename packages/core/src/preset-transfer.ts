@@ -11,7 +11,8 @@ import {
   PRESET_DATA_MESSAGE_COUNT,
   PRESET_PARAMS_PER_MESSAGE,
   PRESET_VALUE_COUNT,
-  resolvePresetVersion,
+  DEFAULT_VERSION_WIRE,
+  parse14BitPair,
   type PresetSnapshot,
   decodePresetName,
   encodePresetName,
@@ -52,6 +53,8 @@ export function buildRequestPresetHeader(
 export interface ParsedPresetHeader {
   presetNumber: number;
   version: number;
+  versionWire: [number, number];
+  numberWire: [number, number];
   name: string;
   tags: number;
   stepCount: number;
@@ -106,8 +109,8 @@ function stripSysexBody(data: Uint8Array): Uint8Array {
 
 function parsePresetHeaderAt(body: Uint8Array, rel: number): ParsedPresetHeader | null {
   if (rel + 24 > body.length) return null;
-  const presetNumber = unpack14(body[rel], body[rel + 1]);
-  const version = unpack14(body[rel + 2], body[rel + 3]);
+  const num = parse14BitPair(body[rel], body[rel + 1]);
+  const ver = parse14BitPair(body[rel + 2], body[rel + 3]);
   const nameBytes = body.slice(rel + 4, rel + 19);
   const tags = unpack28(
     body[rel + 19],
@@ -117,8 +120,10 @@ function parsePresetHeaderAt(body: Uint8Array, rel: number): ParsedPresetHeader 
   );
   const stepCount = body[rel + 23];
   return {
-    presetNumber,
-    version,
+    presetNumber: num.value,
+    numberWire: num.wire,
+    version: ver.value,
+    versionWire: ver.wire,
     name: decodePresetName([...nameBytes]),
     tags,
     stepCount,
@@ -199,8 +204,9 @@ export function buildPresetHeader(
   sysexId: number,
   snapshot: PresetSnapshot
 ): Uint8Array {
-  const [pMsb, pLsb] = pack14(snapshot.number);
-  const [vMsb, vLsb] = pack14(snapshot.version);
+  const [pMsb, pLsb] =
+    snapshot.numberWire ?? pack14(snapshot.number);
+  const [vMsb, vLsb] = snapshot.versionWire;
   const nameBytes = encodePresetName(snapshot.name);
   const [t3, t2, t1, t0] = pack28(snapshot.tags);
   const payload = [
@@ -271,6 +277,8 @@ export function parseSyxBlob(data: Uint8Array, sysexId = 0): PresetSnapshot[] {
     if (header) {
       const snap = createEmptySnapshot(header.presetNumber);
       snap.version = header.version;
+      snap.versionWire = [...header.versionWire];
+      snap.numberWire = [...header.numberWire];
       snap.name = header.name;
       snap.tags = header.tags;
       snap.stepCount = header.stepCount;
@@ -348,8 +356,10 @@ export class PresetTransferService {
   private sendQueue: Uint8Array[] = [];
   private sendTimer: ReturnType<typeof setTimeout> | null = null;
   private ackTimeout: ReturnType<typeof setTimeout> | null = null;
-  /** Last preset version seen from a device header (for saves without full load). */
-  private devicePresetVersion: number | null = null;
+  private deviceVersionWire: [number, number] = [...DEFAULT_VERSION_WIRE];
+  private headerWaiters: Array<{
+    resolve: (header: ParsedPresetHeader | null) => void;
+  }> = [];
 
   setSysexId(id: number): void {
     this.sysexId = Math.max(0, Math.min(127, Math.round(id)));
@@ -372,8 +382,8 @@ export class PresetTransferService {
     return this.snapshot;
   }
 
-  getDevicePresetVersion(): number | null {
-    return this.devicePresetVersion;
+  getDeviceVersionWire(): [number, number] {
+    return [...this.deviceVersionWire];
   }
 
   private emit(status: string): void {
@@ -404,13 +414,39 @@ export class PresetTransferService {
       this.snapshot = createEmptySnapshot(header.presetNumber);
     }
     this.snapshot.number = header.presetNumber;
+    this.snapshot.numberWire = [...header.numberWire];
     this.snapshot.version = header.version;
+    this.snapshot.versionWire = [...header.versionWire];
     this.snapshot.name = header.name;
     this.snapshot.tags = header.tags;
     this.snapshot.stepCount = header.stepCount;
-    if (header.version > 0) {
-      this.devicePresetVersion = header.version;
-    }
+    this.deviceVersionWire = [...header.versionWire];
+    const waiters = this.headerWaiters.splice(0);
+    for (const w of waiters) w.resolve(header);
+  }
+
+  /** Fetch preset header from device (version/name/tags) before save. */
+  requestHeaderAndWait(
+    presetNumber: number,
+    timeoutMs = 1500
+  ): Promise<ParsedPresetHeader | null> {
+    return new Promise((resolve) => {
+      const waiter = { resolve };
+      this.headerWaiters.push(waiter);
+      this.sendOutput?.(buildRequestPresetHeader(this.sysexId, presetNumber));
+      const timer = setTimeout(() => {
+        const idx = this.headerWaiters.indexOf(waiter);
+        if (idx >= 0) {
+          this.headerWaiters.splice(idx, 1);
+          resolve(null);
+        }
+      }, timeoutMs);
+      const original = waiter.resolve;
+      waiter.resolve = (header) => {
+        clearTimeout(timer);
+        original(header);
+      };
+    });
   }
 
   handleSysex(data: Uint8Array): boolean {
@@ -484,10 +520,11 @@ export class PresetTransferService {
     const snap: PresetSnapshot = {
       ...snapshot,
       valuesByOffset: [...snapshot.valuesByOffset],
-      version: resolvePresetVersion(
-        snapshot.version,
-        this.devicePresetVersion
-      ),
+      versionWire: snapshot.versionWire?.length
+        ? [...snapshot.versionWire]
+        : [...this.deviceVersionWire],
+      numberWire: snapshot.numberWire ?? (pack14(snapshot.number) as [number, number]),
+      version: snapshot.version,
       stepCount: Math.max(1, snapshot.stepCount || 1),
       name: snapshot.name || "",
     };

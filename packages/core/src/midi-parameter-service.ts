@@ -100,6 +100,17 @@ export class MidiParameterService {
     });
   }
 
+  /** Editor mode on, then query active preset (retries). */
+  async requestActivePresetRobust(): Promise<ActivatedPresetInfo | null> {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      this.enableEditorMode();
+      await new Promise((r) => setTimeout(r, 60 + attempt * 40));
+      const info = await this.requestActivePreset(900);
+      if (info && info.presetNumber >= 0) return info;
+    }
+    return null;
+  }
+
   handleMidiMessage(event: MIDIMessageEvent): void {
     const data = event.data;
     if (!data?.length) return;

@@ -20,7 +20,7 @@ import {
   cloneSnapshot,
   buildSnapshotFromLiveValues,
   canSaveToPresetSlot,
-  resolvePresetVersion,
+  pack14,
   snapshotToLiveValues,
   snapshotToJson,
   snapshotFromJson,
@@ -122,7 +122,9 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       if (phase === "complete" && snapshot) {
         loadedSnapshotRef.current = cloneSnapshot(snapshot);
         setHasLoadedSnapshot(true);
-        setPresetSlot(snapshot.number);
+        if (snapshot.number >= 1 && snapshot.number <= 300) {
+          setPresetSlot(snapshot.number);
+        }
         midiParameterService.applySnapshotValues(snapshotToLiveValues(snapshot));
         workspaceStore.upsert(snapshot, false);
         setWorkspaceTick((t) => t + 1);
@@ -134,6 +136,13 @@ export function MidiProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!conn.connected) return;
     return midiParameterService.onNotification((code) => {
+      if (code === 4) {
+        const [a, b] = presetTransferService.getDeviceVersionWire();
+        setPresetStatus(
+          `Incompatible preset version (device expects wire bytes ${a}, ${b}). Load the preset from the device, then Save.`
+        );
+        return;
+      }
       if (code !== 1) {
         setPresetStatus(NOTIFICATION_LABELS[code] ?? `Notification ${code}`);
       }
@@ -184,27 +193,37 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     setHasLoadedSnapshot(false);
     loadedSnapshotRef.current = null;
     midiParameterService.enableEditorMode();
-    setPresetStatus("Reading active preset on device…");
-    const active = await midiParameterService.requestActivePreset();
-    const targetSlot = active?.presetNumber ?? presetSlot;
-    if (active && active.presetNumber >= 0) {
-      setPresetSlot(active.presetNumber);
-      setPresetStatus(
-        `Device: preset ${active.presetNumber}, step ${active.step + 1} — loading live edit…`
-      );
+    let loadSlot = 0;
+    if (presetSlot >= 1 && presetSlot <= 300) {
+      loadSlot = presetSlot;
+      setPresetStatus(`Loading preset ${loadSlot}…`);
     } else {
-      setPresetStatus("Loading live edit (preset 0)…");
+      setPresetStatus("Reading active preset on device…");
+      const active = await midiParameterService.requestActivePresetRobust();
+      if (active && active.presetNumber >= 1 && active.presetNumber <= 300) {
+        loadSlot = active.presetNumber;
+        setPresetSlot(active.presetNumber);
+        setPresetStatus(
+          `Device on preset ${active.presetNumber} (step ${active.step + 1}) — loading…`
+        );
+      } else {
+        setPresetSlot(0);
+        setPresetStatus("Live step — loading current edit…");
+      }
     }
-    presetTransferService.requestPreset(0);
-    if (active && active.presetNumber >= 1) {
-      setTimeout(
-        () => presetTransferService.requestPresetHeaderOnly(active.presetNumber),
-        100
-      );
-    }
+    presetTransferService.requestPreset(loadSlot);
   }, [conn.connected, presetSlot]);
 
-  const savePresetToDevice = useCallback(() => {
+  useEffect(() => {
+    if (!conn.connected) return;
+    return midiParameterService.onActivePreset((info) => {
+      if (info.presetNumber >= 1 && info.presetNumber <= 300) {
+        setPresetSlot(info.presetNumber);
+      }
+    });
+  }, [conn.connected]);
+
+  const savePresetToDevice = useCallback(async () => {
     if (!conn.connected) return;
     if (!canSaveToPresetSlot(presetSlot)) {
       setPresetStatus(
@@ -212,6 +231,16 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       );
       return;
     }
+    if (
+      presetTransferService.getPhase() === "receiving" ||
+      presetTransferService.getPhase() === "sending"
+    ) {
+      setPresetStatus("Wait until the current preset transfer finishes.");
+      return;
+    }
+    midiParameterService.enableEditorMode();
+    setPresetStatus(`Reading header for preset ${presetSlot}…`);
+    const header = await presetTransferService.requestHeaderAndWait(presetSlot);
     const live = midiParameterService.getValuesMap();
     const svcSnap = presetTransferService.getSnapshot();
     let base =
@@ -219,12 +248,12 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       (svcSnap ? cloneSnapshot(svcSnap) : null);
     if (!base && live.size >= 20) {
       base = buildSnapshotFromLiveValues(presetSlot, presetName, live, {
-        version: resolvePresetVersion(
-          svcSnap?.version ?? 0,
-          presetTransferService.getDevicePresetVersion()
-        ),
-        tags: svcSnap?.tags,
-        stepCount: svcSnap?.stepCount,
+        versionWire:
+          header?.versionWire ??
+          svcSnap?.versionWire ??
+          presetTransferService.getDeviceVersionWire(),
+        tags: header?.tags ?? svcSnap?.tags,
+        stepCount: header?.stepCount ?? svcSnap?.stepCount,
       });
     }
     if (!base) {
@@ -233,16 +262,20 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       );
       return;
     }
-    midiParameterService.enableEditorMode();
+    const versionWire: [number, number] = header
+      ? [...header.versionWire]
+      : base.versionWire ?? presetTransferService.getDeviceVersionWire();
+    const [nMsb, nLsb] = pack14(presetSlot);
     const merged = mergeLiveValuesIntoSnapshot(
       {
         ...base,
         number: presetSlot,
         name: normalizePresetName(presetName),
-        version: resolvePresetVersion(
-          base.version,
-          presetTransferService.getDevicePresetVersion()
-        ),
+        versionWire,
+        version: header?.version ?? base.version,
+        numberWire: [nMsb, nLsb],
+        tags: header?.tags ?? base.tags,
+        stepCount: header?.stepCount ?? base.stepCount,
       },
       live
     );

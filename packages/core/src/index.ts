@@ -1,5 +1,6 @@
 export * from "./parameters.js";
 export * from "./sysex.js";
+export { pack14, unpack14 } from "./sysex.js";
 export * from "./registry.js";
 export * from "./midi-parameter-service.js";
 export * from "./preset-transfer.js";
