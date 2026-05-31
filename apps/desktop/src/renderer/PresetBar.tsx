@@ -1,39 +1,35 @@
-import { canSaveToPresetSlot, presetSlotLabel } from "@vlt/core";
+import { canSaveToPresetSlot } from "@vlt/core";
 
 export interface PresetBarProps {
   presetSlot: number;
+  slotOptions: { value: number; label: string }[];
   onPresetSlotChange: (slot: number) => void;
   presetName: string;
   onPresetNameChange: (name: string) => void;
   onLoad: () => void;
+  onLoadAllNames: () => void;
+  onCancelBulk: () => void;
   onSave: () => void;
   transferStatus: string;
   hasLoadedSnapshot: boolean;
   connected: boolean;
+  bulkActive: boolean;
 }
-
-const SLOT_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: presetSlotLabel(0) },
-  ...Array.from({ length: 275 }, (_, i) => ({
-    value: i + 1,
-    label: presetSlotLabel(i + 1),
-  })),
-  ...Array.from({ length: 25 }, (_, i) => ({
-    value: 276 + i,
-    label: presetSlotLabel(276 + i),
-  })),
-];
 
 export function PresetBar({
   presetSlot,
+  slotOptions,
   onPresetSlotChange,
   presetName,
   onPresetNameChange,
   onLoad,
+  onLoadAllNames,
+  onCancelBulk,
   onSave,
   transferStatus,
   hasLoadedSnapshot,
   connected,
+  bulkActive,
 }: PresetBarProps) {
   return (
     <div className="preset-bar">
@@ -41,10 +37,10 @@ export function PresetBar({
         Slot
         <select
           value={presetSlot}
-          disabled={!connected}
+          disabled={!connected || bulkActive}
           onChange={(e) => onPresetSlotChange(Number(e.target.value))}
         >
-          {SLOT_OPTIONS.map((o) => (
+          {slotOptions.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
@@ -57,7 +53,7 @@ export function PresetBar({
           type="text"
           maxLength={15}
           value={presetName}
-          disabled={!connected}
+          disabled={!connected || bulkActive}
           placeholder="(15 chars max)"
           onChange={(e) => onPresetNameChange(e.target.value)}
         />
@@ -65,14 +61,28 @@ export function PresetBar({
       <button
         type="button"
         className="secondary"
-        disabled={!connected}
+        disabled={!connected || bulkActive}
         onClick={onLoad}
       >
         Load from device
       </button>
       <button
         type="button"
-        disabled={!connected || !canSaveToPresetSlot(presetSlot)}
+        className="secondary"
+        disabled={!connected || bulkActive}
+        title="Fetch names for presets 1–275 (fast)"
+        onClick={onLoadAllNames}
+      >
+        Load all names
+      </button>
+      {bulkActive && (
+        <button type="button" className="secondary" onClick={onCancelBulk}>
+          Cancel bulk
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={!connected || !canSaveToPresetSlot(presetSlot) || bulkActive}
         title={
           !canSaveToPresetSlot(presetSlot)
             ? "Slot 0 is the live step — save to preset 1–275 or a favorite"
@@ -96,7 +106,9 @@ export function PresetBar({
       >
         {hasLoadedSnapshot
           ? transferStatus
-          : `${transferStatus} · Load before Save to avoid empty parameters.`}
+          : transferStatus
+            ? `${transferStatus} · Load before Save to avoid empty parameters.`
+            : "Load before Save to avoid empty parameters."}
       </span>
     </div>
   );

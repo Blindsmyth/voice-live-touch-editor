@@ -1,5 +1,10 @@
 import type { PresetSnapshot } from "./preset-snapshot.js";
-import { snapshotFromJson, snapshotToJson } from "./preset-snapshot.js";
+import {
+  cloneSnapshot,
+  snapshotFromJson,
+  snapshotToJson,
+} from "./preset-snapshot.js";
+import { pack14 } from "./sysex.js";
 import {
   presetMessagesToSyxBlob,
   parseSyxBlob,
@@ -46,6 +51,52 @@ export class PresetWorkspace {
   clear(): void {
     this.entries.clear();
   }
+
+  /** Copy preset at `from` to slot `to` (workspace only until sent to device). */
+  copySlot(from: number, to: number): boolean {
+    const src = this.entries.get(from);
+    if (!src) return false;
+    const snap = cloneSnapshotForSlot(src.snapshot, to);
+    this.upsert(snap, true);
+    return true;
+  }
+
+  /** Swap two workspace presets (slot numbers in snapshots are updated). */
+  swapSlots(a: number, b: number): boolean {
+    const ea = this.entries.get(a);
+    const eb = this.entries.get(b);
+    if (!ea && !eb) return false;
+    if (ea && !eb) {
+      this.upsert(cloneSnapshotForSlot(ea.snapshot, b), ea.dirty);
+      this.remove(a);
+      return true;
+    }
+    if (!ea && eb) {
+      this.upsert(cloneSnapshotForSlot(eb.snapshot, a), eb.dirty);
+      this.remove(b);
+      return true;
+    }
+    const snapA = cloneSnapshotForSlot(ea!.snapshot, b);
+    const snapB = cloneSnapshotForSlot(eb!.snapshot, a);
+    this.upsert(snapA, ea!.dirty);
+    this.upsert(snapB, eb!.dirty);
+    return true;
+  }
+
+  listDirty(): WorkspaceEntry[] {
+    return this.list().filter((e) => e.dirty);
+  }
+}
+
+function cloneSnapshotForSlot(
+  snapshot: PresetSnapshot,
+  slot: number
+): PresetSnapshot {
+  const [msb, lsb] = pack14(slot);
+  const snap = cloneSnapshot(snapshot);
+  snap.number = slot;
+  snap.numberWire = [msb, lsb];
+  return snap;
 }
 
 export function exportSnapshotJson(snapshot: PresetSnapshot): string {

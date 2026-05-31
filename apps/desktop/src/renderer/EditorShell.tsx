@@ -21,6 +21,11 @@ export function EditorShell() {
     presetName,
     setPresetName,
     loadPresetFromDevice,
+    loadAllNamesFromDevice,
+    loadAllFullFromDevice,
+    cancelBulkTransfer,
+    bulkActive,
+    slotOptions,
     savePresetToDevice,
     presetStatus,
     hasLoadedSnapshot,
@@ -39,6 +44,10 @@ export function EditorShell() {
     exportSelectedPreset,
     importPresetFile,
     sendWorkspaceToDevice,
+    sendAllToDevice,
+    copyWorkspacePreset,
+    swapWorkspacePresets,
+    saveSnapshotBackup,
     refreshBackups,
     mainView,
     setMainView,
@@ -140,14 +149,18 @@ export function EditorShell() {
       {conn.connected && mainView === "editor" && (
         <PresetBar
           presetSlot={presetSlot}
+          slotOptions={slotOptions}
           onPresetSlotChange={setPresetSlot}
           presetName={presetName}
           onPresetNameChange={setPresetName}
           onLoad={loadPresetFromDevice}
+          onLoadAllNames={loadAllNamesFromDevice}
+          onCancelBulk={cancelBulkTransfer}
           onSave={savePresetToDevice}
           transferStatus={presetStatus}
           hasLoadedSnapshot={hasLoadedSnapshot}
           connected={conn.connected}
+          bulkActive={bulkActive}
         />
       )}
 
@@ -212,6 +225,7 @@ export function EditorShell() {
             backups={backups}
             libraryStatus={libraryStatus}
             connected={conn.connected}
+            bulkActive={bulkActive}
             selectedWorkspaceSlot={selectedWorkspaceSlot}
             onSelectSlot={(slot) => {
               setSelectedWorkspaceSlot(slot);
@@ -221,10 +235,16 @@ export function EditorShell() {
                 setPresetName(entry.name);
               }
             }}
-            onBackupWorkspace={() => void backupWorkspace()}
+            onLoadAllNames={loadAllNamesFromDevice}
+            onLoadAllFull={loadAllFullFromDevice}
+            onCancelBulk={cancelBulkTransfer}
+            onBackupWorkspace={() => void saveSnapshotBackup()}
             onExportSelected={() => void exportSelectedPreset()}
             onImport={() => void importPresetFile()}
             onSendToDevice={sendWorkspaceToDevice}
+            onSendAllToDevice={sendAllToDevice}
+            onCopy={copyWorkspacePreset}
+            onSwap={swapWorkspacePresets}
             onRefreshBackups={() => void refreshBackups()}
           />
         )}

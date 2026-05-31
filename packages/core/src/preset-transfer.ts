@@ -359,6 +359,27 @@ export type PresetTransferListener = (state: {
   headerReceived?: boolean;
 }) => void;
 
+export type BulkJob =
+  | { kind: "load-header"; slot: number }
+  | { kind: "load-full"; slot: number }
+  | { kind: "send"; snapshot: PresetSnapshot };
+
+export type BulkMode = "load-headers" | "load-full" | "send-all";
+
+export type BulkProgress = {
+  active: boolean;
+  mode: BulkMode | null;
+  total: number;
+  done: number;
+  currentSlot: number | null;
+  status: string;
+};
+
+export type BulkSlotListener = (
+  snapshot: PresetSnapshot,
+  partial: boolean
+) => void;
+
 /** True when all preset data chunks (0x21) for a full dump have arrived. */
 export function isPresetDataComplete(received: Set<number>): boolean {
   const lastIndex = PRESET_DATA_MESSAGE_COUNT - 1;
@@ -391,9 +412,18 @@ export class PresetTransferService {
     resolve: (header: ParsedPresetHeader | null) => void;
   }> = [];
 
+  private bulkQueue: BulkJob[] = [];
+  private bulkMode: BulkMode | null = null;
+  private bulkDone = 0;
+  private bulkHeaderOnly = false;
+  private bulkSlotListener: BulkSlotListener | null = null;
+  private bulkGapTimer: ReturnType<typeof setTimeout> | null = null;
+
   /** Gap between preset packets if the device does not send notification 1. */
   private static readonly PACE_FALLBACK_MS = 250;
   private static readonly SAVE_TOTAL_MS = 60000;
+  private static readonly BULK_SLOT_GAP_MS = 180;
+  private static readonly BULK_HEADER_TIMEOUT_MS = 4000;
 
   setSysexId(id: number): void {
     this.sysexId = Math.max(0, Math.min(127, Math.round(id)));
@@ -418,6 +448,127 @@ export class PresetTransferService {
   onState(listener: PresetTransferListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  onBulkSlot(listener: BulkSlotListener): () => void {
+    this.bulkSlotListener = listener;
+    return () => {
+      if (this.bulkSlotListener === listener) this.bulkSlotListener = null;
+    };
+  }
+
+  getBulkProgress(): BulkProgress {
+    return {
+      active: this.bulkMode !== null,
+      mode: this.bulkMode,
+      total: this.bulkDone + this.bulkQueue.length + (this.isBulkBusy() ? 1 : 0),
+      done: this.bulkDone,
+      currentSlot: this.snapshot?.number ?? null,
+      status: this.bulkMode ? `${this.bulkMode}…` : "",
+    };
+  }
+
+  private isBulkBusy(): boolean {
+    return (
+      this.phase === "receiving" ||
+      this.phase === "sending" ||
+      this.phase === "awaiting_ack"
+    );
+  }
+
+  cancelBulk(): void {
+    if (this.bulkGapTimer) clearTimeout(this.bulkGapTimer);
+    this.bulkGapTimer = null;
+    this.bulkQueue = [];
+    this.bulkMode = null;
+    this.bulkHeaderOnly = false;
+    this.bulkDone = 0;
+    if (this.phase === "receiving") this.cancelReceive();
+    if (this.phase === "sending" || this.phase === "awaiting_ack") {
+      this.cancelSave();
+    }
+    this.emit("Bulk operation cancelled.");
+  }
+
+  startBulkLoadHeaders(slots: number[]): void {
+    this.startBulk(
+      "load-headers",
+      slots.map((slot) => ({ kind: "load-header", slot }))
+    );
+  }
+
+  startBulkLoadFull(slots: number[]): void {
+    this.startBulk(
+      "load-full",
+      slots.map((slot) => ({ kind: "load-full", slot }))
+    );
+  }
+
+  startBulkSendAll(snapshots: PresetSnapshot[]): void {
+    this.startBulk(
+      "send-all",
+      snapshots.map((snapshot) => ({ kind: "send", snapshot }))
+    );
+  }
+
+  private startBulk(mode: BulkMode, jobs: BulkJob[]): void {
+    if (jobs.length === 0) return;
+    this.cancelBulk();
+    this.bulkMode = mode;
+    this.bulkQueue = jobs;
+    this.bulkDone = 0;
+    this.emit(`Starting ${mode} (${jobs.length} presets)…`);
+    this.runNextBulkJob();
+  }
+
+  private runNextBulkJob(): void {
+    if (this.bulkGapTimer) clearTimeout(this.bulkGapTimer);
+    this.bulkGapTimer = null;
+    if (this.bulkQueue.length === 0) {
+      const mode = this.bulkMode;
+      this.bulkMode = null;
+      this.bulkHeaderOnly = false;
+      this.emit(
+        mode === "send-all"
+          ? "Send all complete."
+          : mode === "load-full"
+            ? "Load all complete."
+            : "Load all names complete."
+      );
+      return;
+    }
+    const job = this.bulkQueue[0];
+    const remaining = this.bulkQueue.length;
+    if (job.kind === "load-header") {
+      this.emit(
+        `Loading names… slot ${job.slot} (${this.bulkDone + 1}/${this.bulkDone + remaining})`
+      );
+      this.requestPresetHeaderBulk(job.slot);
+    } else if (job.kind === "load-full") {
+      this.emit(
+        `Loading presets… slot ${job.slot} (${this.bulkDone + 1}/${this.bulkDone + remaining})`
+      );
+      this.requestPreset(job.slot);
+    } else {
+      this.emit(
+        `Sending… slot ${job.snapshot.number} (${this.bulkDone + 1}/${this.bulkDone + remaining})`
+      );
+      this.savePreset(job.snapshot);
+    }
+  }
+
+  private scheduleNextBulkJob(): void {
+    this.bulkDone += 1;
+    this.bulkQueue.shift();
+    if (this.bulkGapTimer) clearTimeout(this.bulkGapTimer);
+    this.bulkGapTimer = setTimeout(() => this.runNextBulkJob(), PresetTransferService.BULK_SLOT_GAP_MS);
+  }
+
+  private completeBulkSlot(partial: boolean): void {
+    if (this.snapshot && this.bulkSlotListener) {
+      this.bulkSlotListener(this.snapshot, partial);
+    }
+    this.scheduleNextBulkJob();
   }
 
   getPhase(): PresetTransferPhase {
@@ -486,6 +637,11 @@ export class PresetTransferService {
         this.finishReceiving();
         return;
       }
+      if (this.bulkMode === "load-full") {
+        this.emit(`Slot ${presetNumber}: load timed out (skipped)`);
+        this.scheduleNextBulkJob();
+        return;
+      }
       this.phase = "idle";
       this.headerReceived = false;
       this.emit(
@@ -496,6 +652,35 @@ export class PresetTransferService {
 
   requestPresetHeaderOnly(presetNumber: number): void {
     this.sendOutput?.(buildRequestPresetHeader(this.sysexId, presetNumber));
+  }
+
+  private requestPresetHeaderBulk(presetNumber: number): void {
+    if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+    this.bulkHeaderOnly = true;
+    this.expectingPresetData = false;
+    this.phase = "receiving";
+    this.headerReceived = false;
+    this.snapshot = createEmptySnapshot(presetNumber);
+    this.receivedData.clear();
+    this.sendOutput?.(buildRequestPresetHeader(this.sysexId, presetNumber));
+    this.receiveTimeout = setTimeout(() => {
+      if (this.phase !== "receiving" || !this.bulkHeaderOnly) return;
+      if (this.headerReceived) {
+        this.finishHeaderOnlyBulk();
+      } else {
+        this.emit(`Slot ${presetNumber}: no response (skipped)`);
+        this.scheduleNextBulkJob();
+      }
+    }, PresetTransferService.BULK_HEADER_TIMEOUT_MS);
+  }
+
+  private finishHeaderOnlyBulk(): void {
+    if (!this.snapshot || this.phase !== "receiving") return;
+    if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+    this.receiveTimeout = null;
+    this.bulkHeaderOnly = false;
+    this.phase = "complete";
+    this.completeBulkSlot(true);
   }
 
   applyHeaderToSnapshot(header: ParsedPresetHeader): void {
@@ -546,6 +731,10 @@ export class PresetTransferService {
         return true;
       }
       this.applyHeaderToSnapshot(header);
+      if (this.bulkHeaderOnly && this.phase === "receiving") {
+        this.finishHeaderOnlyBulk();
+        return true;
+      }
       if (this.phase === "idle" && this.expectingPresetData) {
         this.phase = "receiving";
       }
@@ -584,10 +773,13 @@ export class PresetTransferService {
     if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
     this.receiveTimeout = null;
     this.expectingPresetData = false;
+    this.bulkHeaderOnly = false;
     this.phase = "complete";
-    this.emit(
-      `Preset ${this.snapshot.number} loaded (${this.snapshot.name || "unnamed"})`
-    );
+    const msg = `Preset ${this.snapshot.number} loaded (${this.snapshot.name || "unnamed"})`;
+    this.emit(msg);
+    if (this.bulkMode === "load-full") {
+      this.completeBulkSlot(false);
+    }
   }
 
   handleNotification(code: NotificationCode): void {
@@ -615,6 +807,20 @@ export class PresetTransferService {
       this.sendQueue = [];
       this.phase = "idle";
       this.emit(NOTIFICATION_LABELS[code] ?? `Error ${code}`);
+      if (this.bulkMode === "send-all") {
+        this.scheduleNextBulkJob();
+      }
+    }
+    if (
+      code === 2 &&
+      this.bulkMode &&
+      (this.phase === "receiving" || this.bulkHeaderOnly)
+    ) {
+      this.emit(`Slot ${this.snapshot?.number ?? "?"}: empty (skipped)`);
+      if (this.receiveTimeout) clearTimeout(this.receiveTimeout);
+      this.bulkHeaderOnly = false;
+      this.phase = "idle";
+      this.scheduleNextBulkJob();
     }
   }
 
@@ -681,6 +887,9 @@ export class PresetTransferService {
     this.emit(
       `Preset ${this.snapshot.number} saved to device (${this.snapshot.name || "unnamed"})`
     );
+    if (this.bulkMode === "send-all") {
+      this.completeBulkSlot(false);
+    }
   }
 
   /** Send one SysEx packet; wait for device ack (or short fallback) before the next. */
@@ -731,6 +940,10 @@ export class PresetTransferService {
     this.sendQueue = [];
     this.phase = "idle";
     this.emit(message);
+    if (this.bulkMode === "send-all") {
+      this.bulkMode = null;
+      this.bulkQueue = [];
+    }
   }
 
   private sendPresetBytes(msg: Uint8Array): boolean {

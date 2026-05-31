@@ -6,6 +6,7 @@ export * from "./midi-parameter-service.js";
 export * from "./preset-transfer.js";
 export * from "./preset-snapshot.js";
 export * from "./preset-library.js";
+export * from "./preset-bulk.js";
 export * from "./parameter-enums.js";
 export { presetParameters } from "./generated/preset-parameters.js";
 export { systemParameters } from "./generated/system-parameters.js";
