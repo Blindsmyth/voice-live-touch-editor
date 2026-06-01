@@ -33,6 +33,23 @@ for (const p of presetParameters) {
   offsetToId.set(p.offset, p.id);
   idToOffset.set(p.id, p.offset);
 }
+if (!idToOffset.has(harmVol.id)) {
+  offsetToId.set(harmVol.offset, harmVol.id);
+  idToOffset.set(harmVol.id, harmVol.offset);
+}
+
+function defaultValuesByOffset(): number[] {
+  const values = new Array<number>(PRESET_VALUE_COUNT).fill(0);
+  for (const p of presetParameters) {
+    if (p.offset >= 0 && p.offset < PRESET_VALUE_COUNT) {
+      values[p.offset] = p.centre;
+    }
+  }
+  if (harmVol.offset >= 0 && harmVol.offset < PRESET_VALUE_COUNT) {
+    values[harmVol.offset] = harmVol.centre;
+  }
+  return values;
+}
 
 /** Parse 14-bit field; `wire` is always the raw bytes from the message (for echo on save). */
 export function parse14BitPair(
