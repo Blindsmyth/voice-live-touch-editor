@@ -551,7 +551,9 @@ export class PresetTransferService {
       this.emit(
         `Sending… slot ${job.snapshot.number} (${this.bulkDone + 1}/${this.bulkDone + remaining})`
       );
-      this.savePreset(job.snapshot);
+      if (!this.savePreset(job.snapshot)) {
+        this.scheduleNextBulkJob();
+      }
     }
   }
 
@@ -822,10 +824,10 @@ export class PresetTransferService {
     }
   }
 
-  savePreset(snapshot: PresetSnapshot): void {
+  savePreset(snapshot: PresetSnapshot): boolean {
     if (snapshot.number < 1) {
       this.emit("Cannot save to slot 0 — choose a user preset (1–275) or favorite (276–300).");
-      return;
+      return false;
     }
     this.clearSendTimers();
     this.expectingPresetData = false;
@@ -862,6 +864,7 @@ export class PresetTransferService {
       }
     }, PresetTransferService.SAVE_TOTAL_MS);
     this.sendNextSaveMessage();
+    return this.phase === "sending" || this.phase === "awaiting_ack";
   }
 
   private onSavePaceAck(): void {
@@ -945,14 +948,25 @@ export class PresetTransferService {
   }
 
   private sendPresetBytes(msg: Uint8Array): boolean {
-    if (!this.sendOutput) return false;
+    if (!this.sendOutput) {
+      this.failSave("MIDI output not connected — reconnect and try Save again.");
+      return false;
+    }
     if (!isValidSysexMessage(msg)) {
       this.failSave(
         "Preset SysEx encoding error (invalid byte >127) — try Load from device again."
       );
       return false;
     }
-    return this.sendOutput(msg);
+    this.lastSendFailDetail = null;
+    if (!this.sendOutput(msg)) {
+      this.failSave(
+        this.lastSendFailDetail ??
+          "MIDI SysEx send failed — check the output port and try again."
+      );
+      return false;
+    }
+    return true;
   }
 
   reset(): void {

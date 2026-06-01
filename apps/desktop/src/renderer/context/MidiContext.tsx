@@ -366,7 +366,11 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     const versionWire: [number, number] = header
       ? [...header.versionWire]
       : base.versionWire ?? presetTransferService.getDeviceVersionWire();
-    const [nMsb, nLsb] = pack14(presetSlot);
+    const numberWire: [number, number] = header?.numberWire
+      ? [...header.numberWire]
+      : base.numberWire
+        ? [...base.numberWire]
+        : (pack14(presetSlot) as [number, number]);
     const merged = mergeLiveValuesIntoSnapshot(
       {
         ...base,
@@ -374,13 +378,15 @@ export function MidiProvider({ children }: { children: ReactNode }) {
         name: normalizePresetName(presetName),
         versionWire,
         version: header?.version ?? base.version,
-        numberWire: [nMsb, nLsb],
+        numberWire,
         tags: header?.tags ?? base.tags,
         stepCount: header?.stepCount ?? base.stepCount,
       },
       live
     );
-    presetTransferService.savePreset(merged);
+    if (!presetTransferService.savePreset(merged)) {
+      return;
+    }
     workspaceStore.upsert(merged, false);
     loadedSnapshotRef.current = cloneSnapshot(merged);
     setHasLoadedSnapshot(true);
@@ -519,8 +525,9 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       snap,
       slot === presetSlot ? midiParameterService.getValuesMap() : new Map()
     );
-    presetTransferService.savePreset(merged);
-    setPresetStatus(`Sending preset ${merged.number}…`);
+    if (presetTransferService.savePreset(merged)) {
+      setPresetStatus(`Sending preset ${merged.number}…`);
+    }
   }, [selectedWorkspaceSlot, presetSlot]);
 
   const sendAllToDevice = useCallback(() => {

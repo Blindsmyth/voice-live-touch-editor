@@ -1,5 +1,6 @@
 import { pack14 } from "./sysex.js";
 import { presetParameters } from "./generated/preset-parameters.js";
+import { harmVol } from "./parameters.js";
 
 /** Parameter set version 0.26 — wire bytes [0, 26] per TC-Helicon Touch SysEx manual. */
 export const PRESET_PARAMETER_VERSION = 26;
@@ -62,7 +63,7 @@ export function createEmptySnapshot(presetNumber: number): PresetSnapshot {
     name: "",
     tags: 0,
     stepCount: 1,
-    valuesByOffset: presetParameters.map((p) => p.centre),
+    valuesByOffset: defaultValuesByOffset(),
   };
 }
 
