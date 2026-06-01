@@ -19,6 +19,7 @@ export interface PresetLibraryPanelProps {
   onCopy: (from: number, to: number) => void;
   onSwap: (a: number, b: number) => void;
   onRefreshBackups: () => void;
+  onRestoreBackup: (backupId: string) => void;
 }
 
 export function PresetLibraryPanel({
@@ -39,6 +40,7 @@ export function PresetLibraryPanel({
   onCopy,
   onSwap,
   onRefreshBackups,
+  onRestoreBackup,
 }: PresetLibraryPanelProps) {
   const [copyFrom, setCopyFrom] = useState("1");
   const [copyTo, setCopyTo] = useState("2");
@@ -196,8 +198,19 @@ export function PresetLibraryPanel({
         <p className="vlt-empty small">No snapshots yet — use Save snapshot.</p>
       ) : (
         <ul className="backup-list">
-          {backups.slice(0, 12).map((b) => (
-            <li key={b}>{b}</li>
+          {backups.slice(0, 20).map((b) => (
+            <li key={b} className="backup-row">
+              <span className="backup-id" title={b}>
+                {b.replace(/_/g, " ")}
+              </span>
+              <button
+                type="button"
+                className="secondary small-btn"
+                onClick={() => onRestoreBackup(b)}
+              >
+                Restore
+              </button>
+            </li>
           ))}
         </ul>
       )}

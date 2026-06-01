@@ -80,6 +80,7 @@ interface MidiContextValue {
   swapWorkspacePresets: (a: number, b: number) => void;
   saveSnapshotBackup: () => void;
   refreshBackups: () => void;
+  restoreWorkspaceFromBackup: (backupId: string) => void;
   mainView: "editor" | "library";
   setMainView: (v: "editor" | "library") => void;
 }
@@ -438,6 +439,48 @@ export function MidiProvider({ children }: { children: ReactNode }) {
     await backupWorkspace();
   }, [backupWorkspace]);
 
+  const restoreWorkspaceFromBackup = useCallback(async (backupId: string) => {
+    if (!window.presetLibrary) return;
+    const ok = window.confirm(
+      `Replace the current workspace with snapshot “${backupId}”? This cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      const text = await window.presetLibrary.readBackupFile(
+        backupId,
+        "workspace.json"
+      );
+      const ws = workspaceFromJson(text);
+      workspaceStore.clear();
+      for (const snap of ws.presets) {
+        workspaceStore.upsert(snap, false);
+      }
+      const first = workspaceStore.get(1) ?? workspaceStore.list()[0];
+      if (first) {
+        loadedSnapshotRef.current = cloneSnapshot(first.snapshot);
+        setHasLoadedSnapshot(true);
+        setPresetSlot(first.slot);
+        setPresetName(first.name);
+        midiParameterService.applySnapshotValues(
+          snapshotToLiveValues(first.snapshot)
+        );
+      } else {
+        loadedSnapshotRef.current = null;
+        setHasLoadedSnapshot(false);
+      }
+      setSelectedWorkspaceSlot(first?.slot ?? null);
+      setWorkspaceTick((t) => t + 1);
+      setTick((t) => t + 1);
+      setLibraryStatus(
+        `Restored workspace “${ws.label}” (${ws.presets.length} presets) from ${backupId}`
+      );
+    } catch (err) {
+      setLibraryStatus(
+        `Restore failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }, []);
+
   const exportSelectedPreset = useCallback(async () => {
     if (!window.presetLibrary) return;
     const slot = selectedWorkspaceSlot ?? loadedSnapshotRef.current?.number;
@@ -637,6 +680,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       copyWorkspacePreset,
       swapWorkspacePresets,
       refreshBackups,
+      restoreWorkspaceFromBackup,
       mainView,
       setMainView,
     }),
@@ -676,6 +720,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       copyWorkspacePreset,
       swapWorkspacePresets,
       refreshBackups,
+      restoreWorkspaceFromBackup,
       mainView,
     ]
   );

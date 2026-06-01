@@ -48,6 +48,7 @@ export function EditorShell() {
     swapWorkspacePresets,
     saveSnapshotBackup,
     refreshBackups,
+    restoreWorkspaceFromBackup,
     mainView,
     setMainView,
   } = useMidiContext();
@@ -244,6 +245,7 @@ export function EditorShell() {
             onCopy={copyWorkspacePreset}
             onSwap={swapWorkspacePresets}
             onRefreshBackups={() => void refreshBackups()}
+            onRestoreBackup={(id) => void restoreWorkspaceFromBackup(id)}
           />
         )}
       </div>
