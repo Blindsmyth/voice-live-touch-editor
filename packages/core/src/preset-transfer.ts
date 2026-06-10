@@ -19,6 +19,7 @@ import {
   createEmptySnapshot,
 } from "./preset-snapshot.js";
 import { isValidSysexMessage, pack14, pack28, unpack14, unpack28 } from "./sysex.js";
+import { harmVol } from "./parameters.js";
 import { presetParameters } from "./generated/preset-parameters.js";
 
 function buildEnvelope(sysexId: number, messageId: number): number[] {
@@ -182,9 +183,20 @@ export function parsePresetData(
   const values: number[] = [];
   for (let i = 0; i < PRESET_PARAMS_PER_MESSAGE; i++) {
     const base = rel + 1 + i * 4;
-    values.push(
-      unpack28(body[base], body[base + 1], body[base + 2], body[base + 3])
+    const offset = index * PRESET_PARAMS_PER_MESSAGE + i;
+    const wire = unpack28(
+      body[base],
+      body[base + 1],
+      body[base + 2],
+      body[base + 3]
     );
+    const logical = unpackPresetValueAtOffset(offset, wire);
+    if (index === 3 && offset === 80) {
+      // #region agent log
+      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'preset-transfer.ts:parsePresetData',message:'load wire offset80',data:{wire,logical,bytes:[body[base],body[base+1],body[base+2],body[base+3]]},timestamp:Date.now(),hypothesisId:'H11',runId:'post-fix4'})}).catch(()=>{});
+      // #endregion
+    }
+    values.push(logical);
   }
 
   const dataBytes = body.slice(rel + 1, rel + 1 + 100);
@@ -226,11 +238,39 @@ export function buildPresetHeader(
 const offsetToPresetParam = new Map(
   presetParameters.map((p) => [p.offset, p] as const)
 );
+if (!offsetToPresetParam.has(harmVol.offset)) {
+  offsetToPresetParam.set(harmVol.offset, harmVol);
+}
 
 function clampPresetValueAtOffset(offset: number, value: number): number {
   const def = offsetToPresetParam.get(offset);
   if (!def) return Math.round(value);
   return Math.round(Math.max(def.min, Math.min(def.max, value)));
+}
+
+/** dB-style preset params where 0 dB is max; device recall may treat all-zero wire as unset. */
+function isDbLevelPresetParam(def: { min: number; max: number }): boolean {
+  return def.max === 0 && def.min === -61;
+}
+
+/** Encode a logical preset value for wire (may differ from live 0x22 packing). */
+function packPresetValueAtOffset(offset: number, logical: number): number {
+  const def = offsetToPresetParam.get(offset);
+  const value = def ? clampPresetValueAtOffset(offset, logical) : Math.round(logical);
+  if (def && isDbLevelPresetParam(def)) {
+    return value - def.min;
+  }
+  return value;
+}
+
+/** Decode preset wire value to logical (inverse of packPresetValueAtOffset). */
+function unpackPresetValueAtOffset(offset: number, wire: number): number {
+  const def = offsetToPresetParam.get(offset);
+  if (def && isDbLevelPresetParam(def)) {
+    if (wire >= 1) return wire + def.min;
+    return wire;
+  }
+  return wire;
 }
 
 export function buildPresetData(
@@ -244,8 +284,13 @@ export function buildPresetData(
     const offset = start + i;
     const raw =
       offset < valuesByOffset.length ? valuesByOffset[offset] : 0;
-    const value = clampPresetValueAtOffset(offset, raw);
+    const value = packPresetValueAtOffset(offset, raw);
     const [v3, v2, v1, v0] = pack28(value);
+    if (index === 3 && offset === 80) {
+      // #region agent log
+      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'preset-transfer.ts:buildPresetData',message:'save wire offset80',data:{logical:raw,wireValue:value,bytes:[v3,v2,v1,v0]},timestamp:Date.now(),hypothesisId:'H11',runId:'post-fix4'})}).catch(()=>{});
+      // #endregion
+    }
     dataBytes.push(v3, v2, v1, v0);
   }
   const checksum = sysexChecksum(dataBytes);
@@ -783,6 +828,11 @@ export class PresetTransferService {
   }
 
   handleNotification(code: NotificationCode): void {
+    if (code === 6 || code === 8) {
+      // #region agent log
+      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'preset-transfer.ts:handleNotification',message:'save/load error notification',data:{code,phase:this.phase,slot:this.snapshot?.number},timestamp:Date.now(),hypothesisId:'H11',runId:'post-fix4'})}).catch(()=>{});
+      // #endregion
+    }
     if (code === 1) {
       if (this.awaitingPaceAck && this.phase === "sending") {
         this.onSavePaceAck();

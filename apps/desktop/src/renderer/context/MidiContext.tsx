@@ -108,6 +108,22 @@ export function MidiProvider({ children }: { children: ReactNode }) {
   const [mainView, setMainView] = useState<"editor" | "library">("editor");
   const [bulkActive, setBulkActive] = useState(false);
   const loadedSnapshotRef = useRef<PresetSnapshot | null>(null);
+  const lastLivePushRef = useRef(0);
+  const lastPolledPresetRef = useRef<number | null>(null);
+  const presetPollBusyRef = useRef(false);
+
+  const pushSnapshotToDeviceLive = useCallback(
+    (snapshot: PresetSnapshot, reason: "save" | "load" | "active-preset") => {
+      const pairs = snapshotToLiveValues(snapshot);
+      midiParameterService.applySnapshotValues(pairs);
+      midiParameterService.syncSnapshotToLiveStep(pairs);
+      lastLivePushRef.current = Date.now();
+      // #region agent log
+      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'MidiContext.tsx:pushSnapshotToDeviceLive',message:'sync live step',data:{reason,id201:pairs.find(p=>p.id===201)?.value,offset80:snapshot.valuesByOffset[80],pairCount:pairs.length},timestamp:Date.now(),hypothesisId:reason==='load'?'H9':reason==='active-preset'?'H10':'H6',runId:'post-fix3'})}).catch(()=>{});
+      // #endregion
+    },
+    []
+  );
 
   useEffect(() => {
     midiParameterService.setOutput(conn.output);
@@ -153,6 +169,11 @@ export function MidiProvider({ children }: { children: ReactNode }) {
         setPresetSlot(snapshot.number);
       }
       if (phase === "complete" && snapshot) {
+        // #region agent log
+        fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'MidiContext.tsx:onState',message:'phase complete snapshot offset80',data:{bulk,status,offset80:snapshot.valuesByOffset[80],presetNumber:snapshot.number},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
+        const savedToDevice =
+          !bulk && status.includes("saved to device");
         workspaceStore.upsert(snapshot, false);
         if (bulk) {
           workspaceStore.markDirty(snapshot.number, false);
@@ -161,7 +182,17 @@ export function MidiProvider({ children }: { children: ReactNode }) {
         if (!bulk) {
           loadedSnapshotRef.current = cloneSnapshot(snapshot);
           setHasLoadedSnapshot(true);
-          midiParameterService.applySnapshotValues(snapshotToLiveValues(snapshot));
+          const loadedFromDevice = status.includes("loaded");
+          if (savedToDevice || loadedFromDevice) {
+            pushSnapshotToDeviceLive(
+              snapshot,
+              loadedFromDevice ? "load" : "save"
+            );
+          } else {
+            midiParameterService.applySnapshotValues(
+              snapshotToLiveValues(snapshot)
+            );
+          }
           setTick((t) => t + 1);
         } else if (snapshot.number === presetSlot) {
           loadedSnapshotRef.current = cloneSnapshot(snapshot);
@@ -192,7 +223,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
         }
       }
     });
-  }, [presetSlot]);
+  }, [presetSlot, pushSnapshotToDeviceLive]);
 
   useEffect(() => {
     if (!conn.connected) return;
@@ -234,6 +265,10 @@ export function MidiProvider({ children }: { children: ReactNode }) {
   const refreshGroup = useCallback(() => {
     if (!conn.connected) return;
     const params = getParametersForGroup(activeGroup, scope);
+    const has201 = params.some((p) => p.id === 201);
+    // #region agent log
+    if (has201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'MidiContext.tsx:refreshGroup',message:'refreshGroup requests id201',data:{activeGroup,scope,currentValue:midiParameterService.getValue(201)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     midiParameterService.requestParameters(
       params.map((p) => p.id),
       8
@@ -306,12 +341,51 @@ export function MidiProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!conn.connected) return;
-    return midiParameterService.onActivePreset((info) => {
-      if (info.presetNumber >= 1 && info.presetNumber <= 300) {
+    let cancelled = false;
+    const pollActivePreset = async () => {
+      if (cancelled || presetPollBusyRef.current) return;
+      if (presetTransferService.getPhase() !== "idle") return;
+      if (Date.now() - lastLivePushRef.current < 1800) return;
+      presetPollBusyRef.current = true;
+      try {
+        midiParameterService.enableEditorMode();
+        const info = await midiParameterService.requestActivePreset(500);
+        if (
+          !info ||
+          info.presetNumber < 1 ||
+          info.presetNumber > 300 ||
+          info.presetNumber === lastPolledPresetRef.current
+        ) {
+          return;
+        }
+        lastPolledPresetRef.current = info.presetNumber;
         setPresetSlot(info.presetNumber);
+        const entry = workspaceStore.get(info.presetNumber);
+        // #region agent log
+        fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'MidiContext.tsx:pollActivePreset',message:'hardware preset change detected',data:{presetNumber:info.presetNumber,step:info.step,hasWorkspace:!!entry?.snapshot,offset80:entry?.snapshot?.valuesByOffset[80]},timestamp:Date.now(),hypothesisId:'H10',runId:'post-fix4'})}).catch(()=>{});
+        // #endregion
+        if (entry?.snapshot) {
+          const snap = cloneSnapshot(entry.snapshot);
+          loadedSnapshotRef.current = snap;
+          setHasLoadedSnapshot(true);
+          setPresetName(entry.name);
+          pushSnapshotToDeviceLive(snap, "active-preset");
+          setTick((t) => t + 1);
+        } else {
+          presetTransferService.requestPreset(info.presetNumber);
+        }
+      } finally {
+        presetPollBusyRef.current = false;
       }
-    });
-  }, [conn.connected]);
+    };
+    const id = setInterval(() => {
+      void pollActivePreset();
+    }, 1200);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [conn.connected, pushSnapshotToDeviceLive]);
 
   const savePresetToDevice = useCallback(async () => {
     if (!conn.connected) return;
@@ -332,7 +406,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       setPresetStatus("MIDI output not connected — use Connect MIDI first.");
       return;
     }
-    midiParameterService.flushPendingSends();
+    midiParameterService.flushPendingSendsImmediate();
     midiParameterService.enableEditorMode();
     await new Promise((r) => setTimeout(r, 80));
     let header: Awaited<
@@ -343,7 +417,7 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       setPresetStatus(`Reading header for preset ${presetSlot}…`);
       header = await presetTransferService.requestHeaderAndWait(presetSlot);
     }
-    const live = midiParameterService.getValuesMap();
+    const live = midiParameterService.getEffectiveValuesMap();
     const svcSnap = presetTransferService.getSnapshot();
     let base =
       loadedSnapshotRef.current ??
@@ -385,6 +459,9 @@ export function MidiProvider({ children }: { children: ReactNode }) {
       },
       live
     );
+    // #region agent log
+    fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'MidiContext.tsx:savePresetToDevice',message:'merged save values',data:{live201:live.get(201),offset80:merged.valuesByOffset[80],offset77:merged.valuesByOffset[77]},timestamp:Date.now(),hypothesisId:'H6',runId:'post-fix2'})}).catch(()=>{});
+    // #endregion
     if (!presetTransferService.savePreset(merged)) {
       return;
     }

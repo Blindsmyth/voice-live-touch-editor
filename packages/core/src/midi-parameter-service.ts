@@ -31,7 +31,8 @@ export class MidiParameterService {
   private notificationListeners = new Set<NotificationListener>();
   private activePresetListeners = new Set<ActivePresetListener>();
   private debounceTimers = new Map<number, ReturnType<typeof setTimeout>>();
-  private suppressSend = false;
+  /** Last value sent (or queued) from user setParameter — stale device echoes are ignored. */
+  private userOutbound = new Map<number, number>();
   private lastSendError: string | null = null;
   private assembler = createSysexAssembler((bytes) => this.handleSysex(bytes));
   private activePresetWaiters: Array<{
@@ -134,6 +135,7 @@ export class MidiParameterService {
   }
 
   requestParameter(id: number): void {
+    this.userOutbound.delete(id);
     this.send(buildRequestParameter(this.sysexId, id));
   }
 
@@ -145,18 +147,25 @@ export class MidiParameterService {
 
   setParameter(id: number, value: number, immediate = false): void {
     const def = getParameter(id);
-    if (!def) return;
+    if (!def) {
+      // #region agent log
+      if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:setParameter',message:'setParameter missing def',data:{id,value},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
     const clamped = Math.round(
       Math.max(def.min, Math.min(def.max, value))
     );
     this.values.set(id, clamped);
-
-    if (this.suppressSend) return;
+    // #region agent log
+    if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:setParameter',message:'local set',data:{requested:value,clamped,immediate},timestamp:Date.now(),hypothesisId:'H4',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
 
     const existing = this.debounceTimers.get(id);
     if (existing) clearTimeout(existing);
 
     const send = () => {
+      this.userOutbound.set(id, clamped);
       this.send(buildSetParameter(this.sysexId, id, clamped));
     };
 
@@ -170,16 +179,28 @@ export class MidiParameterService {
     const clamped = Math.round(
       Math.max(def.min, Math.min(def.max, value))
     );
-    this.suppressSend = true;
+    const outbound = this.userOutbound.get(id);
+    if (outbound !== undefined && clamped !== outbound) {
+      // #region agent log
+      if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:applyRemoteValue',message:'ignored stale echo',data:{requested:value,clamped,outbound,local:this.values.get(id)},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(()=>{});
+      // #endregion
+      return;
+    }
+    if (outbound !== undefined && clamped === outbound) {
+      this.userOutbound.delete(id);
+    }
     this.values.set(id, clamped);
+    // #region agent log
+    if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:applyRemoteValue',message:'remote overwrite',data:{requested:value,clamped,prev:this.values.get(id)},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
     for (const l of this.listeners) l(id, clamped);
-    setTimeout(() => {
-      this.suppressSend = false;
-    }, 150);
   }
 
   applySnapshotValues(pairs: { id: number; value: number }[]): void {
-    this.suppressSend = true;
+    const p201 = pairs.find((p) => p.id === 201);
+    // #region agent log
+    if (p201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:applySnapshotValues',message:'snapshot apply id201',data:{value:p201.value,pairCount:pairs.length},timestamp:Date.now(),hypothesisId:'H3',runId:'post-fix'})}).catch(()=>{});
+    // #endregion
     for (const { id, value } of pairs) {
       const def = getParameter(id);
       if (!def) continue;
@@ -187,11 +208,9 @@ export class MidiParameterService {
         Math.max(def.min, Math.min(def.max, value))
       );
       this.values.set(id, clamped);
+      this.userOutbound.set(id, clamped);
       for (const l of this.listeners) l(id, clamped);
     }
-    setTimeout(() => {
-      this.suppressSend = false;
-    }, 200);
   }
 
   enableEditorMode(): void {
@@ -204,6 +223,40 @@ export class MidiParameterService {
 
   getLastSendError(): string | null {
     return this.lastSendError;
+  }
+
+  /** Values map merged with user outbound pins (editor truth during save). */
+  getEffectiveValuesMap(): Map<number, number> {
+    const merged = new Map(this.values);
+    for (const [id, value] of this.userOutbound) {
+      merged.set(id, value);
+    }
+    return merged;
+  }
+
+  /** Flush debounced sends immediately (do not drop pending edits before preset save). */
+  flushPendingSendsImmediate(): void {
+    for (const [id, timer] of this.debounceTimers.entries()) {
+      clearTimeout(timer);
+      const v = this.values.get(id);
+      if (v === undefined) continue;
+      const def = getParameter(id);
+      if (!def) continue;
+      const clamped = Math.round(Math.max(def.min, Math.min(def.max, v)));
+      this.userOutbound.set(id, clamped);
+      this.send(buildSetParameter(this.sysexId, id, clamped));
+    }
+    this.debounceTimers.clear();
+  }
+
+  /** Push saved preset values to the device live step (0x22), so audio matches the preset. */
+  syncSnapshotToLiveStep(
+    pairs: { id: number; value: number }[],
+    gapMs = 6
+  ): void {
+    pairs.forEach(({ id, value }, i) => {
+      setTimeout(() => this.setParameter(id, value, true), i * gapMs);
+    });
   }
 
   /** Cancel pending debounced parameter sends before a bulk preset transfer. */
