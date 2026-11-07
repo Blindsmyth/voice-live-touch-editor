@@ -2,12 +2,13 @@ import { presetParameters } from "./generated/preset-parameters.js";
 import { systemParameters } from "./generated/system-parameters.js";
 import { parameterGroups } from "./generated/parameter-groups.js";
 import { mirrorsForGroup } from "./parameter-mirrors.js";
+import { liveOnlyParameters } from "./live-parameters.js";
 import { harmVol } from "./parameters.js";
 import type { DisplayedParameter, ParameterDef, ParameterScope } from "./parameters.js";
 
 export { parameterGroups };
 
-const allParameters: ParameterDef[] = [...presetParameters, ...systemParameters];
+const allParameters: ParameterDef[] = [...presetParameters, ...systemParameters, ...liveOnlyParameters];
 
 export const parameterById = new Map<number, ParameterDef>(
   allParameters.map((p) => [p.id, p])
@@ -61,7 +62,7 @@ export function getParametersForGroup(
   groupId: string,
   scope: ParameterScope
 ): DisplayedParameter[] {
-  const list = scope === "preset" ? presetParameters : systemParameters;
+  const list = scope === "preset" ? [...presetParameters, ...liveOnlyParameters.filter((p) => p.scope === "preset")] : systemParameters;
   const native = list
     .filter((p) => p.group === groupId)
     .map((p) => toDisplayedNative(p, groupId));
@@ -87,7 +88,7 @@ export function searchParameters(
   if (!q) return [];
   const list = scope
     ? scope === "preset"
-      ? presetParameters
+      ? [...presetParameters, ...liveOnlyParameters.filter((p) => p.scope === "preset")]
       : systemParameters
     : allParameters;
   return list.filter(

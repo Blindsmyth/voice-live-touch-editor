@@ -2,6 +2,7 @@ export * from "./parameters.js";
 export * from "./sysex.js";
 export { pack14, unpack14, isValidSysexMessage } from "./sysex.js";
 export * from "./registry.js";
+export * from "./live-parameters.js";
 export * from "./midi-parameter-service.js";
 export * from "./preset-transfer.js";
 export * from "./preset-snapshot.js";

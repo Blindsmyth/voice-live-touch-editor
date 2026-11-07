@@ -148,18 +148,12 @@ export class MidiParameterService {
   setParameter(id: number, value: number, immediate = false): void {
     const def = getParameter(id);
     if (!def) {
-      // #region agent log
-      if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:setParameter',message:'setParameter missing def',data:{id,value},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       return;
     }
     const clamped = Math.round(
       Math.max(def.min, Math.min(def.max, value))
     );
     this.values.set(id, clamped);
-    // #region agent log
-    if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:setParameter',message:'local set',data:{requested:value,clamped,immediate},timestamp:Date.now(),hypothesisId:'H4',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
 
     const existing = this.debounceTimers.get(id);
     if (existing) clearTimeout(existing);
@@ -181,26 +175,17 @@ export class MidiParameterService {
     );
     const outbound = this.userOutbound.get(id);
     if (outbound !== undefined && clamped !== outbound) {
-      // #region agent log
-      if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:applyRemoteValue',message:'ignored stale echo',data:{requested:value,clamped,outbound,local:this.values.get(id)},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(()=>{});
-      // #endregion
       return;
     }
     if (outbound !== undefined && clamped === outbound) {
       this.userOutbound.delete(id);
     }
     this.values.set(id, clamped);
-    // #region agent log
-    if (id === 201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:applyRemoteValue',message:'remote overwrite',data:{requested:value,clamped,prev:this.values.get(id)},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
     for (const l of this.listeners) l(id, clamped);
   }
 
   applySnapshotValues(pairs: { id: number; value: number }[]): void {
     const p201 = pairs.find((p) => p.id === 201);
-    // #region agent log
-    if (p201) fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'midi-parameter-service.ts:applySnapshotValues',message:'snapshot apply id201',data:{value:p201.value,pairCount:pairs.length},timestamp:Date.now(),hypothesisId:'H3',runId:'post-fix'})}).catch(()=>{});
-    // #endregion
     for (const { id, value } of pairs) {
       const def = getParameter(id);
       if (!def) continue;

@@ -14,6 +14,8 @@ export interface WorkspaceEntry {
   slot: number;
   name: string;
   dirty: boolean;
+  /** Header only (name/tags) — parameter values are not loaded from the device yet. */
+  partial: boolean;
   snapshot: PresetSnapshot;
 }
 
@@ -28,11 +30,12 @@ export class PresetWorkspace {
     return this.entries.get(slot);
   }
 
-  upsert(snapshot: PresetSnapshot, dirty = false): WorkspaceEntry {
+  upsert(snapshot: PresetSnapshot, dirty = false, partial = false): WorkspaceEntry {
     const entry: WorkspaceEntry = {
       slot: snapshot.number,
       name: snapshot.name,
       dirty,
+      partial,
       snapshot,
     };
     this.entries.set(snapshot.number, entry);
@@ -57,29 +60,19 @@ export class PresetWorkspace {
     const src = this.entries.get(from);
     if (!src) return false;
     const snap = cloneSnapshotForSlot(src.snapshot, to);
-    this.upsert(snap, true);
+    this.upsert(snap, true, src.partial);
     return true;
   }
 
-  /** Swap two workspace presets (slot numbers in snapshots are updated). */
+  /** Swap two workspace presets (slot numbers in snapshots are updated); both end up dirty. */
   swapSlots(a: number, b: number): boolean {
     const ea = this.entries.get(a);
     const eb = this.entries.get(b);
     if (!ea && !eb) return false;
-    if (ea && !eb) {
-      this.upsert(cloneSnapshotForSlot(ea.snapshot, b), ea.dirty);
-      this.remove(a);
-      return true;
-    }
-    if (!ea && eb) {
-      this.upsert(cloneSnapshotForSlot(eb.snapshot, a), eb.dirty);
-      this.remove(b);
-      return true;
-    }
-    const snapA = cloneSnapshotForSlot(ea!.snapshot, b);
-    const snapB = cloneSnapshotForSlot(eb!.snapshot, a);
-    this.upsert(snapA, ea!.dirty);
-    this.upsert(snapB, eb!.dirty);
+    this.entries.delete(a);
+    this.entries.delete(b);
+    if (ea) this.upsert(cloneSnapshotForSlot(ea.snapshot, b), true, ea.partial);
+    if (eb) this.upsert(cloneSnapshotForSlot(eb.snapshot, a), true, eb.partial);
     return true;
   }
 

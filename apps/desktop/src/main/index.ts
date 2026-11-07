@@ -1,6 +1,9 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, session } from "electron";
 import { join } from "node:path";
 import { registerPresetLibraryIpc } from "./preset-library-ipc.js";
+
+// Keep backups where earlier builds and the README put them (the package name would otherwise be used).
+app.setPath("userData", join(app.getPath("appData"), "voice-live-touch-editor"));
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -24,6 +27,14 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Web MIDI + SysEx must be granted explicitly outside the dev server.
+  const allowed = new Set(["midi", "midiSysex"]);
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) =>
+    cb(allowed.has(permission))
+  );
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) =>
+    allowed.has(permission)
+  );
   registerPresetLibraryIpc();
   createWindow();
 

@@ -84,3 +84,17 @@ export function workspaceFromJson(text: string): VltWorkspaceFile {
   }
   return parsed;
 }
+
+export type BackupScope = "user" | "selected" | "all";
+
+/** Slots included in a VoiceSupport-style backup of the given scope. */
+export function backupSlotFilter(
+  scope: BackupScope,
+  selected: ReadonlySet<number>
+): (slot: number) => boolean {
+  if (scope === "selected") return (slot) => selected.has(slot);
+  if (scope === "user") {
+    return (slot) => slot >= USER_PRESET_SLOT_MIN && slot <= USER_PRESET_SLOT_MAX;
+  }
+  return (slot) => slot >= 1;
+}

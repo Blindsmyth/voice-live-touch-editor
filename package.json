@@ -11,6 +11,7 @@
     "extract-manual": ".venv-pdf/bin/python scripts/extract-voicelive2-manual.py",
     "dev": "npm run dev -w @vlt/desktop",
     "build": "npm run generate && npm run build -w @vlt/desktop",
-    "dist": "npm run dist -w @vlt/desktop"
+    "dist": "npm run dist -w @vlt/desktop",
+    "app": "npm run generate && npm run app -w @vlt/desktop"
   }
 }

@@ -80,6 +80,14 @@ export function pack28(value: number): [number, number, number, number] {
   ];
 }
 
+/** Plain 28-bit two's complement (manual's create_28_compliment), used for preset bulk data. */
+export function pack28Signed(value: number): [number, number, number, number] {
+  let raw = Math.round(value);
+  if (raw < 0) raw += 1 << 28;
+  raw &= 0xfffffff;
+  return [(raw >> 21) & 0x7f, (raw >> 14) & 0x7f, (raw >> 7) & 0x7f, raw & 0x7f];
+}
+
 /** True if a complete F0…F7 message is valid for Web MIDI (data bytes ≤ 127). */
 export function isValidSysexMessage(bytes: Uint8Array): boolean {
   if (bytes.length < 2 || bytes[0] !== 0xf0 || bytes[bytes.length - 1] !== 0xf7) {

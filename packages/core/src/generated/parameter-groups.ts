@@ -59,13 +59,13 @@ export const parameterGroups: ParameterGroupInfo[] = [
   {
     "id": "Delay",
     "label": "Delay",
-    "presetCount": 15,
+    "presetCount": 19,
     "systemCount": 0
   },
   {
     "id": "Reverb",
     "label": "Reverb",
-    "presetCount": 12,
+    "presetCount": 16,
     "systemCount": 11
   },
   {
@@ -79,12 +79,6 @@ export const parameterGroups: ParameterGroupInfo[] = [
     "label": "Pitch",
     "presetCount": 10,
     "systemCount": 1
-  },
-  {
-    "id": "Ducking",
-    "label": "Ducking",
-    "presetCount": 8,
-    "systemCount": 0
   },
   {
     "id": "Setup",

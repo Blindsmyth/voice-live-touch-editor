@@ -94,8 +94,8 @@
     { "value": 7, "label": "Style 7" }
   ],
   "829": [
-    { "value": 0, "label": "Follow harmony" },
-    { "value": 1, "label": "Fixed key" }
+    { "value": 0, "label": "Harmony key" },
+    { "value": 1, "label": "Own key" }
   ],
   "111": [
     { "value": 0, "label": "A = 440 Hz" },

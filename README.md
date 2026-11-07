@@ -36,6 +36,7 @@ Connect MIDI → choose **Preset** or **System** scope → pick a group in the s
 | `npm run extract-manual` | Re-extract [docs/VoiceLive-2-Manual-v1-5.md](docs/VoiceLive-2-Manual-v1-5.md) from the VoiceLive 2 PDF (requires `.venv-pdf`) |
 | `npm run dev` | Electron dev with HMR |
 | `npm run build` | Production build |
+| `npm run app` | Standalone Apple Silicon `.app` → `apps/desktop/release/mac-arm64/` (ad-hoc signed; right-click → Open on first launch) |
 | `npm run dist` | macOS `.dmg` / `.zip` |
 
 ## Project layout
@@ -64,6 +65,10 @@ examples/            Reference Axoloti / Max editors
 - Enable **Debug hex** to compare with [examples/](examples/)
 
 ## Presets and library
+
+- **Auto-sync on connect** — preset names (1–300) load in seconds, full preset data streams in the background; opening a preset fetches it immediately.
+- **Library view** (VoiceSupport-style): *Working Data* + *Archives*, toolbar Sync / Apply / Backup / Restore / Export / Import. Drag a preset onto another slot to copy (Option = swap); changes are marked `*` until **Apply** writes them to the device.
+- **Auto-backup** after each full sync and before each Apply (toggle in the toolbar); backups can be renamed and deleted (to Trash).
 
 - **Load from device** — requests preset header + data (`0x45` → `0x20` + `0x21`), updates all preset parameters in the editor.
 - **Save to device** — sends header + data; **load first** so unsent slots are not zeroed.

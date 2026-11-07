@@ -22,8 +22,20 @@ export function EditorShell() {
     setPresetName,
     loadPresetFromDevice,
     loadAllFromDevice,
+    syncFromDevice,
     cancelBulkTransfer,
     bulkActive,
+    bulkProgress,
+    syncStage,
+    autoBackup,
+    setAutoBackup,
+    selectedSlots,
+    setSelectedSlots,
+    editWorkspaceSlot,
+    readBackupPresets,
+    copyBackupPresetToWorkspace,
+    renameBackup,
+    deleteBackup,
     slotOptions,
     savePresetToDevice,
     presetStatus,
@@ -37,16 +49,12 @@ export function EditorShell() {
     workspace,
     backups,
     libraryStatus,
-    selectedWorkspaceSlot,
-    setSelectedWorkspaceSlot,
     backupWorkspace,
-    exportSelectedPreset,
+    exportPresets,
     importPresetFile,
-    sendWorkspaceToDevice,
     sendAllToDevice,
     copyWorkspacePreset,
     swapWorkspacePresets,
-    saveSnapshotBackup,
     refreshBackups,
     restoreWorkspaceFromBackup,
     mainView,
@@ -226,26 +234,27 @@ export function EditorShell() {
             libraryStatus={libraryStatus}
             connected={conn.connected}
             bulkActive={bulkActive}
-            selectedWorkspaceSlot={selectedWorkspaceSlot}
-            onSelectSlot={(slot) => {
-              setSelectedWorkspaceSlot(slot);
-              const entry = workspace.find((e) => e.slot === slot);
-              if (entry) {
-                setPresetSlot(entry.slot);
-                setPresetName(entry.name);
-              }
-            }}
-            onLoadAll={loadAllFromDevice}
+            bulkProgress={bulkProgress}
+            syncStage={syncStage}
+            autoBackup={autoBackup}
+            selectedSlots={selectedSlots}
+            onSelectSlots={setSelectedSlots}
+            onEdit={editWorkspaceSlot}
+            onSync={syncFromDevice}
             onCancelBulk={cancelBulkTransfer}
-            onBackupWorkspace={() => void saveSnapshotBackup()}
-            onExportSelected={() => void exportSelectedPreset()}
+            onApply={() => void sendAllToDevice()}
+            onBackup={(scope) => void backupWorkspace(scope)}
+            onExport={exportPresets}
             onImport={() => void importPresetFile()}
-            onSendToDevice={sendWorkspaceToDevice}
-            onSendAllToDevice={sendAllToDevice}
+            onAutoBackupChange={setAutoBackup}
             onCopy={copyWorkspacePreset}
             onSwap={swapWorkspacePresets}
             onRefreshBackups={() => void refreshBackups()}
             onRestoreBackup={(id) => void restoreWorkspaceFromBackup(id)}
+            onRenameBackup={(id, label) => void renameBackup(id, label)}
+            onDeleteBackup={(id) => void deleteBackup(id)}
+            onReadBackup={readBackupPresets}
+            onCopyFromBackup={(id, from, to) => void copyBackupPresetToWorkspace(id, from, to)}
           />
         )}
       </div>

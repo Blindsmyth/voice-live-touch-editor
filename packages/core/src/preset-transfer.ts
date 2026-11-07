@@ -18,7 +18,7 @@ import {
   encodePresetName,
   createEmptySnapshot,
 } from "./preset-snapshot.js";
-import { isValidSysexMessage, pack14, pack28, unpack14, unpack28 } from "./sysex.js";
+import { isValidSysexMessage, pack14, pack28, pack28Signed, unpack14, unpack28 } from "./sysex.js";
 import { harmVol } from "./parameters.js";
 import { presetParameters } from "./generated/preset-parameters.js";
 
@@ -190,13 +190,7 @@ export function parsePresetData(
       body[base + 2],
       body[base + 3]
     );
-    const logical = unpackPresetValueAtOffset(offset, wire);
-    if (index === 3 && offset === 80) {
-      // #region agent log
-      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'preset-transfer.ts:parsePresetData',message:'load wire offset80',data:{wire,logical,bytes:[body[base],body[base+1],body[base+2],body[base+3]]},timestamp:Date.now(),hypothesisId:'H11',runId:'post-fix4'})}).catch(()=>{});
-      // #endregion
-    }
-    values.push(logical);
+    values.push(wire);
   }
 
   const dataBytes = body.slice(rel + 1, rel + 1 + 100);
@@ -248,35 +242,25 @@ function clampPresetValueAtOffset(offset: number, value: number): number {
   return Math.round(Math.max(def.min, Math.min(def.max, value)));
 }
 
-/** dB-style preset params where 0 dB is max; device recall may treat all-zero wire as unset. */
-function isDbLevelPresetParam(def: { min: number; max: number }): boolean {
-  return def.max === 0 && def.min === -61;
-}
-
-/** Encode a logical preset value for wire (may differ from live 0x22 packing). */
-function packPresetValueAtOffset(offset: number, logical: number): number {
-  const def = offsetToPresetParam.get(offset);
-  const value = def ? clampPresetValueAtOffset(offset, logical) : Math.round(logical);
-  if (def && isDbLevelPresetParam(def)) {
-    return value - def.min;
-  }
-  return value;
-}
-
-/** Decode preset wire value to logical (inverse of packPresetValueAtOffset). */
-function unpackPresetValueAtOffset(offset: number, wire: number): number {
-  const def = offsetToPresetParam.get(offset);
-  if (def && isDbLevelPresetParam(def)) {
-    if (wire >= 1) return wire + def.min;
-    return wire;
-  }
+/**
+ * Preset dumps carry dB levels as plain dB (-61..0), the same as the live step and
+ * 0x22 parameters. Verified on 224 device presets: an earlier "stored as 0..61"
+ * assumption shifted every level by -61, which clamped them to -61 dB (muted).
+ * Kept as named pass-throughs so the read/write paths stay explicit.
+ */
+export function presetWireToLogical(_slot: number, _offset: number, wire: number): number {
   return wire;
+}
+
+function presetLogicalToWire(_slot: number, _offset: number, logical: number): number {
+  return logical;
 }
 
 export function buildPresetData(
   sysexId: number,
   index: number,
-  valuesByOffset: number[]
+  valuesByOffset: number[],
+  slot = 0
 ): Uint8Array {
   const start = index * PRESET_PARAMS_PER_MESSAGE;
   const dataBytes: number[] = [];
@@ -284,13 +268,9 @@ export function buildPresetData(
     const offset = start + i;
     const raw =
       offset < valuesByOffset.length ? valuesByOffset[offset] : 0;
-    const value = packPresetValueAtOffset(offset, raw);
-    const [v3, v2, v1, v0] = pack28(value);
-    if (index === 3 && offset === 80) {
-      // #region agent log
-      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'preset-transfer.ts:buildPresetData',message:'save wire offset80',data:{logical:raw,wireValue:value,bytes:[v3,v2,v1,v0]},timestamp:Date.now(),hypothesisId:'H11',runId:'post-fix4'})}).catch(()=>{});
-      // #endregion
-    }
+    const value = presetLogicalToWire(slot, offset, clampPresetValueAtOffset(offset, raw));
+    // Bulk dumps use the manual's plain 28-bit two's complement for negatives.
+    const [v3, v2, v1, v0] = pack28Signed(value);
     dataBytes.push(v3, v2, v1, v0);
   }
   const checksum = sysexChecksum(dataBytes);
@@ -311,7 +291,7 @@ export function presetMessagesToSyxBlob(
   const push = (u: Uint8Array) => parts.push(...u);
   push(buildPresetHeader(sysexId, snapshot));
   for (let i = 0; i < PRESET_DATA_MESSAGE_COUNT; i++) {
-    push(buildPresetData(sysexId, i, snapshot.valuesByOffset));
+    push(buildPresetData(sysexId, i, snapshot.valuesByOffset, snapshot.number));
   }
   return new Uint8Array(parts);
 }
@@ -347,7 +327,9 @@ export function parseSyxBlob(data: Uint8Array, sysexId = 0): PresetSnapshot[] {
       const base = chunk.index * PRESET_PARAMS_PER_MESSAGE;
       chunk.values.forEach((v, j) => {
         const offset = base + j;
-        if (offset < PRESET_VALUE_COUNT) snap.valuesByOffset[offset] = v;
+        if (offset < PRESET_VALUE_COUNT) {
+          snap.valuesByOffset[offset] = presetWireToLogical(snap.number, offset, v);
+        }
       });
     }
     i = end + 1;
@@ -468,6 +450,7 @@ export class PresetTransferService {
   private static readonly PACE_FALLBACK_MS = 250;
   private static readonly SAVE_TOTAL_MS = 60000;
   private static readonly BULK_SLOT_GAP_MS = 180;
+  private static readonly BULK_LOAD_GAP_MS = 10;
   private static readonly BULK_HEADER_TIMEOUT_MS = 4000;
 
   setSysexId(id: number): void {
@@ -606,7 +589,14 @@ export class PresetTransferService {
     this.bulkDone += 1;
     this.bulkQueue.shift();
     if (this.bulkGapTimer) clearTimeout(this.bulkGapTimer);
-    this.bulkGapTimer = setTimeout(() => this.runNextBulkJob(), PresetTransferService.BULK_SLOT_GAP_MS);
+    // Loading: the unit answers a header in ~9 ms and a full preset in ~50 ms, and VoiceSupport
+    // asks for the next one ~5 ms later (measured), so a long gap only slows syncs down.
+    // Sending keeps the longer gap, since the unit writes flash after each saved preset.
+    const gap =
+      this.bulkMode === "send-all"
+        ? PresetTransferService.BULK_SLOT_GAP_MS
+        : PresetTransferService.BULK_LOAD_GAP_MS;
+    this.bulkGapTimer = setTimeout(() => this.runNextBulkJob(), gap);
   }
 
   private completeBulkSlot(partial: boolean): void {
@@ -797,7 +787,11 @@ export class PresetTransferService {
       chunk.values.forEach((v, j) => {
         const offset = base + j;
         if (offset < PRESET_VALUE_COUNT) {
-          this.snapshot!.valuesByOffset[offset] = v;
+          this.snapshot!.valuesByOffset[offset] = presetWireToLogical(
+            this.snapshot!.number,
+            offset,
+            v
+          );
         }
       });
       this.receivedData.add(chunk.index);
@@ -829,9 +823,6 @@ export class PresetTransferService {
 
   handleNotification(code: NotificationCode): void {
     if (code === 6 || code === 8) {
-      // #region agent log
-      fetch('http://127.0.0.1:7637/ingest/f53347c8-0c3a-47a5-abd9-6ed4f8b31484',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'5b1531'},body:JSON.stringify({sessionId:'5b1531',location:'preset-transfer.ts:handleNotification',message:'save/load error notification',data:{code,phase:this.phase,slot:this.snapshot?.number},timestamp:Date.now(),hypothesisId:'H11',runId:'post-fix4'})}).catch(()=>{});
-      // #endregion
     }
     if (code === 1) {
       if (this.awaitingPaceAck && this.phase === "sending") {
@@ -899,7 +890,7 @@ export class PresetTransferService {
     this.sendQueue = [
       buildPresetHeader(this.sysexId, snap),
       ...Array.from({ length: PRESET_DATA_MESSAGE_COUNT }, (_, i) =>
-        buildPresetData(this.sysexId, i, snap.valuesByOffset)
+        buildPresetData(this.sysexId, i, snap.valuesByOffset, snap.number)
       ),
     ];
     this.emit(`Saving preset ${snap.number} to device…`);

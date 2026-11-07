@@ -17,6 +17,14 @@ try {
 } catch {
   console.warn("No parameter-enums.json — options omitted");
 }
+let LABELS = {};
+try {
+  LABELS = JSON.parse(
+    readFileSync(join(root, "packages/core/src/parameter-labels.json"), "utf8")
+  );
+} catch {
+  console.warn("No parameter-labels.json — automatic labels only");
+}
 const sysexMd = readFileSync(
   join(root, "docs/VoiceLive-Touch-Sysex-Manual.md"),
   "utf8"
@@ -64,6 +72,9 @@ function deriveGroup(name) {
   if (/^Reverb /.test(name)) return "Reverb";
   if (/^Transducer /.test(name)) return "Transducer";
   if (/^Correct |^Hardtune |^CorrectionMapCus/.test(name)) return "Pitch";
+  // Ducking belongs to the effect it ducks (Delay / Reverb), like on the device.
+  if (/^Ducking .* Delay$/.test(name)) return "Delay";
+  if (/^Ducking .* Reverb$/.test(name)) return "Reverb";
   if (/^Ducking /.test(name)) return "Ducking";
   if (/^ParEq /.test(name)) return "EQ Harmony";
   if (/^AutoGate/.test(name)) return "Gate";
@@ -110,6 +121,8 @@ function deriveSection(name, group, offset, id) {
     if (name.includes("Mixer_L_6dB")) return { section: "6 dB boost", sectionOrder: 40 };
     return { section: "Mix levels", sectionOrder: 10 };
   }
+  if ((group === "Delay" || group === "Reverb") && /^Ducking /.test(name))
+    return { section: "Ducking", sectionOrder: 20 };
   if (group === "EQ") return { section: "Parametric EQ", sectionOrder: 10 };
   if (group === "Gate") return { section: "Auto gate", sectionOrder: 10 };
   if (group === "Setup") {
@@ -144,7 +157,10 @@ function deriveControl(min, max) {
 }
 
 function makeLabel(name, id) {
+  if (LABELS[String(id)]) return LABELS[String(id)];
   if (LABEL_ALIASES[id]) return LABEL_ALIASES[id];
+  const duck = /^Ducking (\w+) (Delay|Reverb)$/.exec(name);
+  if (duck) return duck[1] === "Enable" ? "Ducking" : `Ducking ${duck[1]}`;
   return name
     .replace(/_/g, " ")
     .replace(/^(Harmony|Mixer_L|Mixer_LP|Mixer_LW|Utility|Block|ParEq|MicroMod|Delay|Reverb|Transducer|Correct|Doubling|Ducking|Choir|AutoGateGain|AutoGateT|PreFX) /, "")
@@ -181,6 +197,12 @@ function parseTable(sectionTitle) {
     });
   }
   for (const r of rows) {
+    // Two-value params with their own option names (e.g. "Harmony key / Own key") read
+    // better as a dropdown than as an unlabeled On/Off toggle.
+    const opts = PARAMETER_ENUMS[String(r.id)];
+    if (r.control === "toggle" && opts && !opts.every((o) => /^(off|on)$/i.test(o.label))) {
+      r.control = "select";
+    }
     const { section, sectionOrder } = deriveSection(r.name, r.group, r.offset, r.id);
     r.section = section;
     r.sectionOrder = sectionOrder;
