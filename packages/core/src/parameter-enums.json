@@ -175,5 +175,11 @@
     { "value": 1, "label": "Tight" },
     { "value": 2, "label": "Male" },
     { "value": 3, "label": "Female" }
+  ],
+  "894": [
+    { "value": 0, "label": "Off (mic, stock)" },
+    { "value": 32513, "label": "Mic only (guitar muted)" },
+    { "value": 32514, "label": "Mic + guitar" },
+    { "value": 32515, "label": "Guitar only" }
   ]
 }

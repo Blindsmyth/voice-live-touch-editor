@@ -37,7 +37,7 @@ export function ParameterControl({
     return (
       <div className="vlt-param-control vlt-param-select">
         <select
-          value={clamped}
+          value={param.options.some((o) => o.value === clamped) ? clamped : param.options[0].value}
           disabled={disabled}
           onChange={(e) => onChange(Number(e.target.value))}
         >

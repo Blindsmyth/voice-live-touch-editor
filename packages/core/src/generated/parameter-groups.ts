@@ -35,7 +35,7 @@ export const parameterGroups: ParameterGroupInfo[] = [
   {
     "id": "Harmony",
     "label": "Harmony",
-    "presetCount": 73,
+    "presetCount": 74,
     "systemCount": 1
   },
   {
@@ -83,7 +83,7 @@ export const parameterGroups: ParameterGroupInfo[] = [
   {
     "id": "Setup",
     "label": "Setup",
-    "presetCount": 19,
+    "presetCount": 18,
     "systemCount": 42
   },
   {

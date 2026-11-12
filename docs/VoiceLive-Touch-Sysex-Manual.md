@@ -436,7 +436,7 @@ Message ID **`0x22`**, 6 data bytes: param ID + 28-bit value.
 | 218 | 960 | CorrectionMapCus Bitfield | 0 | 4095 | 0 |
 | 219 | 962 | Preset Exp_Func | 0 | 17 | 0 |
 | 220 | 963 | Correct Key_Storage | 0 | 11 | 0 |
-| 221 | 964 | Preset Source | 0 | 65535 | 0 |
+| 221 | 894 | Harmony VocalInput | 0 | 32515 | 0 |
 | 222 | 979 | Doubling Gender V1 | -50 | 50 | 0 |
 | 223 | 980 | Doubling Gender V2 | -50 | 50 | 0 |
 | 224 | 981 | Doubling Gender V3 | -50 | 50 | 0 |

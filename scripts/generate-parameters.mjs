@@ -85,6 +85,8 @@ function deriveGroup(name) {
 /** Device-oriented section order (VoiceLive 2 / Touch SysEx table + edit menus). */
 function deriveSection(name, group, offset, id) {
   if (group === "Harmony") {
+    // Firmware Mod 7: preset slot 221 holds param 894 = vocal chain input (mic / guitar). Last in the Harmony tab.
+    if (id === 894) return { section: "Vocal input (mod)", sectionOrder: 95 };
     if (/HarmonyMapCus/.test(name)) return { section: "Custom scale map", sectionOrder: 90 };
     if (/^Harmony Notes/.test(name)) return { section: "Notes mode", sectionOrder: 70 };
     if ([106, 107, 108, 111].includes(id) || (offset >= 19 && offset <= 22))
@@ -203,6 +205,7 @@ function parseTable(sectionTitle) {
     if (r.control === "toggle" && opts && !opts.every((o) => /^(off|on)$/i.test(o.label))) {
       r.control = "select";
     }
+    if (r.id === 894) r.control = "select"; // marker values 0 / 32513..32515 (firmware Mod 7)
     const { section, sectionOrder } = deriveSection(r.name, r.group, r.offset, r.id);
     r.section = section;
     r.sectionOrder = sectionOrder;
